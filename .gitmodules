@@ -4,3 +4,9 @@
 [submodule "external/assimp"]
 	path = external/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "external/spdlog"]
+	path = external/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "external/directx"]
+	path = external/directx
+	url = https://github.com/microsoft/DirectX-Headers.git

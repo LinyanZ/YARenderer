@@ -5,13 +5,119 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
-add_executable(${PROJECT_NAME} src/main.cpp)
+set(SRC_FILES 
+    src/main.cpp
+
+    src/Application.h
+    src/Application.cpp
+
+    src/core/Window.h
+    src/core/Window.cpp
+
+    src/core/Log.h
+    src/core/Log.cpp
+
+    src/core/Timer.h
+    src/core/Timer.cpp
+
+    src/core/UI.h
+    src/core/UI.cpp
+
+    src/core/MathHelper.h
+    src/core/MathHelper.cpp
+
+    src/event/Event.h
+    src/event/ApplicationEvent.h
+    src/event/KeyEvent.h
+    src/event/MouseEvent.h
+
+    src/dx/dx.h
+
+    src/dx/CommandQueue.h
+    src/dx/CommandQueue.cpp
+
+    src/dx/Descriptor.h
+
+    src/dx/DescriptorHeap.h
+    src/dx/DescriptorHeap.cpp
+
+    src/dx/DxContext.h
+    src/dx/DxContext.cpp
+
+    src/dx/Texture.h
+    src/dx/Texture.cpp
+    
+    src/dx/UploadBuffer.h
+    
+    src/dx/Utils.h
+    src/dx/Utils.cpp
+
+    src/rendering/Camera.h
+    src/rendering/Camera.cpp
+
+    src/rendering/CascadeShadowmap.h
+    src/rendering/CascadeShadowmap.cpp
+
+    src/rendering/EnvironmentMap.h
+    src/rendering/EnvironmentMap.cpp
+
+    src/rendering/FrameResource.h
+
+    src/rendering/Light.h
+
+    src/rendering/Material.h
+
+    src/rendering/Mesh.h
+    src/rendering/Mesh.cpp
+
+    src/rendering/PipelineStateManager.h
+    src/rendering/PipelineStateManager.cpp
+
+    src/rendering/Renderer.h
+    src/rendering/Renderer.cpp
+
+    src/rendering/RenderingSettings.h
+
+    src/rendering/RenderingUtils.h
+    src/rendering/RenderingUtils.cpp
+
+    src/rendering/SSAO.h
+    src/rendering/SSAO.cpp
+
+    src/rendering/TAA.h
+    src/rendering/TAA.cpp
+
+    src/rendering/vxgi/VolumeTexture.h
+
+    src/rendering/postProcessing/FXAA.h
+    src/rendering/postProcessing/FXAA.cpp
+
+    src/rendering/postProcessing/MotionBlur.h
+    src/rendering/postProcessing/MotionBlur.cpp
+
+    src/rendering/postProcessing/PostProcessing.h
+    src/rendering/postProcessing/PostProcessing.cpp
+
+    src/rendering/postProcessing/ToneMapping.h
+    src/rendering/postProcessing/ToneMapping.cpp
+
+    src/asset/Image.h
+    src/asset/Image.cpp
+)
+
+add_executable(${PROJECT_NAME} ${SRC_FILES})
+target_include_directories(${PROJECT_NAME} PRIVATE 
+    src 
+    external/directx/include
+)
 
 # assimp
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+add_compile_definitions(ASSIMP_USE_STB_IMAGE_STATIC)
+add_compile_definitions(ASSIMP_BUILD_NO_PBRT_EXPORTER)
 
 add_subdirectory(external/assimp)
 target_include_directories(${PROJECT_NAME}
@@ -42,4 +148,23 @@ target_include_directories(imgui PUBLIC
     external/imgui/backends
 )
 
-target_link_libraries(${PROJECT_NAME} assimp imgui)
+# spdlog
+target_include_directories(${PROJECT_NAME} PRIVATE external/spdlog/include)
+
+# linking libraries
+target_link_libraries(${PROJECT_NAME} assimp imgui dxcompiler.lib d3d12.lib d3dcompiler.lib dxgi.lib dxguid.lib)
+
+# setup precompiled headers
+target_precompile_headers(
+    ${PROJECT_NAME}
+    PRIVATE
+    "src/pch.h"
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+# copy the executable to bin/ folder after build
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}.exe
+    COMMENT "Created ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}.exe"
+)

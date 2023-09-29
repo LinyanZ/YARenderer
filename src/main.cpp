@@ -1,38 +1,26 @@
-#include <iostream>
-#include <filesystem>
-#include <string>
+#include "Application.h"
 
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <assimp/Importer.hpp>
-#include <assimp/Exporter.hpp>
+#if defined(_DEBUG)
+#include <initguid.h>
+DEFINE_GUID(DXGI_DEBUG_ALL, 0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8);
 
-#include <imgui.h>
+void ReportLiveObjects()
+{
+	ComPtr<IDXGIDebug1> dxgiDebug;
+	DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug));
+	dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+}
+#endif
 
 int main(int argc, char const *argv[])
 {
-	std::string filename = "C:\\dev\\YARenderer\\resources\\city\\scene.gltf";
-	Assimp::Importer importer;
+	Log::Init();
+	LOG_WARN("Initialized.");
 
-	unsigned int ImportFlags =
-		aiProcess_CalcTangentSpace |
-		aiProcess_Triangulate |
-		aiProcess_PreTransformVertices |
-		aiProcess_GenNormals |
-		aiProcess_GenUVCoords |
-		aiProcess_OptimizeMeshes |
-		aiProcess_Debone |
-		aiProcess_ConvertToLeftHanded |
-		aiProcess_JoinIdenticalVertices |
-		aiProcess_ValidateDataStructure;
+#if defined(_DEBUG)
+	std::atexit(ReportLiveObjects);
+#endif
 
-	const aiScene *scene = nullptr;
-	scene = importer.ReadFile(filename, ImportFlags);
-
-	std::cout << ((scene) ? "Yes" : "No") << std::endl;
-
-	while (1)
-		;
-
+	Application().Run();
 	return 0;
 }
