@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "structs.hlsl"
 
 #define SHADOW_MAP_SIZE 4096
 #define NUM_CASCADES 4
@@ -6,22 +7,6 @@
 #define LIGHT_SIZE 0.04
 #define MIN_FILTER_RADIUS (2.0 / SHADOW_MAP_SIZE)
 #define NUM_RINGS 10
-
-struct ShadowData
-{
-    float4x4 LightViewProj[4];
-    
-    // Write float ...[4] as float4 ... 
-    // since each 'float' gets 1 16-byte slot due to HLSL packing rule
-    float4 CascadeRadius;
-    float4 CascadeEnds[2];
-    
-    float TransitionRatio;
-    float ShadowSoftness;
-    bool ShowCascades;
-    bool UseVogelDiskSample;
-    int NumSamples;
-};
 
 static float2 g_SampleOffsets[MAX_SAMPLES];
 

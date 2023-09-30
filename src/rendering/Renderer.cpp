@@ -255,12 +255,11 @@ void Renderer::BuildRenderItems()
 #if TEST_SCENE
 	Ref<RenderItem> testScene = std::make_shared<RenderItem>();
 	// testScene->Mesh = Mesh::FromFile("resources/meshes/test_scene2.gltf");
-	testScene->Mesh = Mesh::FromFile("resources/city/scene.gltf");
+	testScene->Mesh = Mesh::FromFile("resources/low_poly_winter_scene/scene.gltf");
 	testScene->Mesh->UploadVertexAndIndexBufferToGPU(device, commandList);
 	testScene->Mesh->LoadTextures(device, commandList, cbvSrvUavHeap);
 	testScene->objCBIndex = 0;
 	testScene->matCBIndex = 0;
-	XMStoreFloat4x4(&testScene->World, XMMatrixScaling(0.1f, 0.1f, 0.1f));
 	m_RenderItems.push_back(testScene);
 
 #endif
@@ -839,14 +838,6 @@ void Renderer::UpdateObjectConstantBuffers()
 		//}
 
 		XMMATRIX world = XMLoadFloat4x4(&ritem->World);
-
-		auto scale = XMMatrixScaling(0.1, 0.1, 0.1);
-
-#if SPONZA_SCENE
-		scale = XMMatrixScaling(1, 1, 1);
-#endif
-
-		world = XMMatrixMultiply(world, scale);
 
 		ObjectConstants objConstants;
 		XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));

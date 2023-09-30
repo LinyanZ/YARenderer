@@ -14,30 +14,21 @@ PipelineStateManager::PipelineStateManager(Device device)
 
 void PipelineStateManager::BuildShadersAndInputLayouts()
 {
-	m_VSByteCodes["default"] = Utils::CompileShader(L"shaders\\defaultVS.hlsl", nullptr, L"VS", L"vs_6_6");
+	// m_VSByteCodes["default"] = Utils::CompileShader(L"shaders\\defaultVS.hlsl", nullptr, L"VS", L"vs_6_6");
 
-	m_PSByteCodes["drawNormal"] = Utils::CompileShader(L"shaders\\drawNormal.hlsl", nullptr, L"PS", L"ps_6_6");
-	m_PSByteCodes["forwardRendering"] = Utils::CompileShader(L"shaders\\forwardRendering.hlsl", nullptr, L"PS", L"ps_6_6");
+	// m_PSByteCodes["drawNormal"] = Utils::CompileShader(L"shaders\\drawNormal.hlsl", nullptr, L"PS", L"ps_6_6");
+	// m_PSByteCodes["forwardRendering"] = Utils::CompileShader(L"shaders\\forwardRendering.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["shadow"] = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, L"VS", L"vs_6_6");
-	m_PSByteCodes["shadow"] = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, L"PS", L"ps_6_6");
+	// m_PSByteCodes["gbuffer"] = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["velocityBuffer"] = Utils::CompileShader(L"shaders\\velocityBuffer.hlsl", nullptr, L"VS", L"vs_6_6");
-	m_PSByteCodes["velocityBuffer"] = Utils::CompileShader(L"shaders\\velocityBuffer.hlsl", nullptr, L"PS", L"ps_6_6");
+	// m_VSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassVS.hlsl", nullptr, L"VS", L"vs_6_6");
+	// m_PSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassPS.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_PSByteCodes["gbuffer"] = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"PS", L"ps_6_6");
-
-	m_VSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassVS.hlsl", nullptr, L"VS", L"vs_6_6");
-	m_PSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassPS.hlsl", nullptr, L"PS", L"ps_6_6");
-
-	m_VSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, L"VS", L"vs_6_6");
-	m_PSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, L"PS", L"ps_6_6");
+	// m_VSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, L"VS", L"vs_6_6");
+	// m_PSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, L"PS", L"ps_6_6");
 
 	m_VSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"VS", L"vs_6_6");
 	m_PSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"PS", L"ps_6_6");
-
-	m_VSByteCodes["skybox"] = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, L"VS", L"vs_6_6");
-	m_PSByteCodes["skybox"] = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, L"PS", L"ps_6_6");
 
 	m_InputLayouts["default"] =
 		{

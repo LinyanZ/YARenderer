@@ -5,3 +5,4 @@ resources/sponza/
 build/
 
 YARenderer.exe
+*.assbin

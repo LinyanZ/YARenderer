@@ -3,6 +3,7 @@
 
 #include "common.hlsl"
 #include "utils.hlsl"
+#include "structs.hlsl"
 
 float3 DoDirectLighting(Light light, float3 albedo, float3 normal, float metalness, float roughness, float3 L, float3 V)
 {
