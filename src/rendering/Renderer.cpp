@@ -28,8 +28,8 @@ Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 	AllocateDescriptors();
 	BuildDescriptors();
 
-	m_ScreenViewport = { 0, 0, (float)width, float(height), 0.0f, 1.0f };
-	m_ScissorRect = { 0, 0, (long)width, (long)height };
+	m_ScreenViewport = {0, 0, (float)width, float(height), 0.0f, 1.0f};
+	m_ScissorRect = {0, 0, (long)width, (long)height};
 	m_Camera.SetLens(0.25f * MathHelper::Pi, (float)width / height, 1.0f, 1000.0f);
 
 	RenderingUtils::Init(dxContext);
@@ -96,12 +96,12 @@ void Renderer::Setup()
 	m_Camera.SetPosition(-2.29, 5.11, 1.15);
 }
 
-void Renderer::OnUpdate(Timer& timer)
+void Renderer::OnUpdate(Timer &timer)
 {
 	OnKeyboardInput(timer.DeltaTime());
 	m_Camera.UpdateViewMatrix();
 
-	//LOG_INFO("Camera: {} {} {}", XMVectorGetX(m_Camera.GetPosition()), XMVectorGetY(m_Camera.GetPosition()), XMVectorGetZ(m_Camera.GetPosition()));
+	// LOG_INFO("Camera: {} {} {}", XMVectorGetX(m_Camera.GetPosition()), XMVectorGetY(m_Camera.GetPosition()), XMVectorGetZ(m_Camera.GetPosition()));
 
 	UpdateLights(timer);
 	UpdateObjectConstantBuffers();
@@ -119,62 +119,65 @@ void Renderer::BeginFrame()
 
 	auto commandList = m_DxContext->GetCommandList();
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_DxContext->CurrentBackBuffer().Resource.Get(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+																		  D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 }
 
 void Renderer::Render()
 {
 	auto commandList = m_DxContext->GetCommandList();
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { m_DxContext->GetCbvSrvUavHeap().Get() };
+	ID3D12DescriptorHeap *descriptorHeaps[] = {m_DxContext->GetCbvSrvUavHeap().Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
+	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("universal").Get());
 
-	VelocityBufferPass(commandList);
-	ShadowMapPass(commandList);
+	commandList->RSSetViewports(1, &m_ScreenViewport);
+	commandList->RSSetScissorRects(1, &m_ScissorRect);
 
-	if (g_RenderingSettings.DynamicUpdate)
-	{
-		ClearVoxel(commandList);
-		VoxelizeScene(commandList);
-		VoxelComputeAverage(commandList);
-		GenVoxelMipmap(commandList);
-	}
+	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 
-	if (g_RenderingSettings.DebugVoxel)
-	{
-		DebugVoxel(commandList);
+	DrawSkybox(commandList);
+	// VelocityBufferPass(commandList);
+	// ShadowMapPass(commandList);
 
-		// Reset for TAA
-		m_FirstFrame = true;
-	}
-	else
-	{
-#if FORWARD_RENDERING
-		ForwardRendering(commandList);
-#endif
+	// if (g_RenderingSettings.DynamicUpdate)
+	// {
+	// 	ClearVoxel(commandList);
+	// 	VoxelizeScene(commandList);
+	// 	VoxelComputeAverage(commandList);
+	// 	GenVoxelMipmap(commandList);
+	// }
 
-#if DEFERRED_RENDERING
-		DeferredRendering(commandList);
-#endif
+	// if (g_RenderingSettings.DebugVoxel)
+	// {
+	// 	DebugVoxel(commandList);
 
-		DrawSkybox(commandList);
-		m_TAA->Render(commandList, m_VelocityBuffer, m_FirstFrame);
+	// 	// Reset for TAA
+	// 	m_FirstFrame = true;
+	// }
+	// else
+	// {
+	// 	ForwardRendering(commandList);
+	// 	DeferredRendering(commandList);
 
-		m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
-	}
+	// 	DrawSkybox(commandList);
+	// 	m_TAA->Render(commandList, m_VelocityBuffer, m_FirstFrame);
 
-	//Debug(commandList, m_SSAO->AmbientMap().Srv, 0);
-	/*Debug(commandList, m_CascadeShadowMap->Srv(0), 12);
-	Debug(commandList, m_CascadeShadowMap->Srv(1), 13);
-	Debug(commandList, m_CascadeShadowMap->Srv(2), 14);
-	Debug(commandList, m_CascadeShadowMap->Srv(3), 15);*/
+	// 	m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
+	// }
+
+	// Debug(commandList, m_SSAO->AmbientMap().Srv, 0);
+	// Debug(commandList, m_CascadeShadowMap->Srv(0), 12);
+	// Debug(commandList, m_CascadeShadowMap->Srv(1), 13);
+	// Debug(commandList, m_CascadeShadowMap->Srv(2), 14);
+	// Debug(commandList, m_CascadeShadowMap->Srv(3), 15);
 }
 
 void Renderer::EndFrame()
 {
 	auto commandList = m_DxContext->GetCommandList();
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_DxContext->CurrentBackBuffer().Resource.Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	UINT64 nextFence = m_DxContext->ExecuteCommandList();
 	CurrFrameResource()->Fence = nextFence;
@@ -182,7 +185,8 @@ void Renderer::EndFrame()
 	m_DxContext->Present(g_RenderingSettings.EnableVSync);
 
 	m_CurrFrameResourceIndex = (m_CurrFrameResourceIndex + 1) % NUM_FRAMES_IN_FLIGHT;
-	if (!g_RenderingSettings.DebugVoxel) m_FirstFrame = false;
+	if (!g_RenderingSettings.DebugVoxel)
+		m_FirstFrame = false;
 }
 
 //
@@ -230,14 +234,14 @@ void Renderer::BuildRenderItems()
 {
 	auto commandList = m_DxContext->GetCommandList();
 	auto device = m_DxContext->GetDevice();
-	auto& cbvSrvUavHeap = m_DxContext->GetCbvSrvUavHeap();
+	auto &cbvSrvUavHeap = m_DxContext->GetCbvSrvUavHeap();
 
 	m_Skybox = Mesh::FromFile("resources/meshes/skybox.gltf");
 	m_Skybox->UploadVertexAndIndexBufferToGPU(device, commandList);
 
 #if TEST_SCENE
 	Ref<RenderItem> testScene = std::make_shared<RenderItem>();
-	//testScene->Mesh = Mesh::FromFile("resources/meshes/test_scene2.gltf");
+	// testScene->Mesh = Mesh::FromFile("resources/meshes/test_scene2.gltf");
 	testScene->Mesh = Mesh::FromFile("resources/city/scene.gltf");
 	testScene->Mesh->UploadVertexAndIndexBufferToGPU(device, commandList);
 	testScene->Mesh->LoadTextures(device, commandList, cbvSrvUavHeap);
@@ -289,7 +293,7 @@ void Renderer::ForwardRendering(GraphicsCommandList commandList)
 	commandList->RSSetScissorRects(1, &m_ScissorRect);
 
 	// Clear the background
-	//commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
+	// commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	// Specify the buffers we are going to render to.
@@ -358,21 +362,21 @@ void Renderer::GBufferPass(GraphicsCommandList commandList)
 {
 	// Indicate a state transition on the resource usage.
 	D3D12_RESOURCE_BARRIER preBarriers[] =
-	{
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAlbedo.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferMetalness.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferRoughness.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAmbient.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
-	};
+		{
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAlbedo.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferMetalness.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferRoughness.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAmbient.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
+		};
 	commandList->ResourceBarrier(5, preBarriers);
 
 	// Clear the background.
-	commandList->ClearRenderTargetView(m_GBufferAlbedo.Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 0.0f }, 0, nullptr);
-	commandList->ClearRenderTargetView(m_GBufferNormal.Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 0.0f }, 0, nullptr);
-	commandList->ClearRenderTargetView(m_GBufferMetalness.Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 0.0f }, 0, nullptr);
-	commandList->ClearRenderTargetView(m_GBufferRoughness.Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 0.0f }, 0, nullptr);
-	commandList->ClearRenderTargetView(m_GBufferAmbient.Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 0.0f }, 0, nullptr);
+	commandList->ClearRenderTargetView(m_GBufferAlbedo.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
+	commandList->ClearRenderTargetView(m_GBufferNormal.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
+	commandList->ClearRenderTargetView(m_GBufferMetalness.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
+	commandList->ClearRenderTargetView(m_GBufferRoughness.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
+	commandList->ClearRenderTargetView(m_GBufferAmbient.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	// Specify the buffers we are going to render to.
@@ -391,13 +395,13 @@ void Renderer::GBufferPass(GraphicsCommandList commandList)
 	DrawRenderItems(commandList);
 
 	D3D12_RESOURCE_BARRIER postBarriers[] =
-	{
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAlbedo.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferMetalness.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferRoughness.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
-		CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAmbient.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
-	};
+		{
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAlbedo.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferMetalness.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferRoughness.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAmbient.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
+		};
 	commandList->ResourceBarrier(5, postBarriers);
 }
 
@@ -419,7 +423,8 @@ void Renderer::LightingPass(GraphicsCommandList commandList)
 {
 	for (UINT i = 0; i < m_Lights.size(); i++)
 	{
-		if (!m_Lights[i].Enabled) continue;
+		if (!m_Lights[i].Enabled)
+			continue;
 
 		// Clear the stencilbuffer to 1 to mark all pixels.
 		commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 1, 0, nullptr);
@@ -487,9 +492,9 @@ void Renderer::LightingPass(GraphicsCommandList commandList)
 void Renderer::DrawNormalsAndDepth(GraphicsCommandList commandList)
 {
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
+																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	float clearValue[] = { 0.0f, 0.0f, 1.0f, 0.0f };
+	float clearValue[] = {0.0f, 0.0f, 1.0f, 0.0f};
 	commandList->ClearRenderTargetView(m_GBufferNormal.Rtv.CPUHandle, clearValue, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
@@ -504,7 +509,7 @@ void Renderer::DrawNormalsAndDepth(GraphicsCommandList commandList)
 	DrawRenderItems(commandList, RenderPass::NormalOnly);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
+																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 }
 
 void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass, bool transparent)
@@ -515,22 +520,22 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 	auto matCB = CurrFrameResource()->MatCB->GetResource();
 	UINT matCBByteSize = Utils::CalcConstantBufferByteSize(sizeof(MaterialConstants));
 
-	for (auto& ritem : m_RenderItems)
+	for (auto &ritem : m_RenderItems)
 	{
 		// Set object constant buffer
 		auto objCBAddress = objectCB->GetGPUVirtualAddress() + ritem->objCBIndex * objCBByteSize;
 		commandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
-		auto& mesh = ritem->Mesh;
+		auto &mesh = ritem->Mesh;
 		commandList->IASetVertexBuffers(0, 1, &mesh->VertexBufferView());
 		commandList->IASetIndexBuffer(&mesh->IndexBufferView());
 		commandList->IASetPrimitiveTopology(ritem->PrimitiveType);
 
-		for (const auto& submesh : mesh->SubMeshes())
+		for (const auto &submesh : mesh->SubMeshes())
 		{
 			// Set material constant buffer
 			auto matCBAddress = matCB->GetGPUVirtualAddress() + (submesh.MaterialIndex + ritem->matCBIndex) * matCBByteSize;
-			auto& material = mesh->Materials()[submesh.MaterialIndex];
+			auto &material = mesh->Materials()[submesh.MaterialIndex];
 
 			switch (pass)
 			{
@@ -541,7 +546,8 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 				break;
 			case RenderPass::ForwardRendering:
 				// Skip transparent objects for opague rendering (and vice versa)
-				if (submesh.Transparent != transparent) continue;
+				if (submesh.Transparent != transparent)
+					continue;
 
 				commandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
 				if (material.HasAlbedoTexture)
@@ -560,7 +566,8 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 			}
 
 			commandList->DrawIndexedInstanced(submesh.IndexCount, 1,
-				submesh.StartIndexLocation, submesh.BaseVertexLocation, 0);;
+											  submesh.StartIndexLocation, submesh.BaseVertexLocation, 0);
+			;
 		}
 	}
 }
@@ -574,7 +581,7 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("shadow").Get());
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadeShadowMap->GetResource(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+																		  D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	// Set shadow pass constant
 	auto passCB = CurrFrameResource()->ShadowCB->GetResource();
@@ -586,7 +593,7 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 		commandList->SetGraphicsRoot32BitConstant(2, i, 0);
 
 		commandList->ClearDepthStencilView(m_CascadeShadowMap->Dsv(i).CPUHandle,
-			D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+										   D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 		commandList->OMSetRenderTargets(0, nullptr, false, &m_CascadeShadowMap->Dsv(i).CPUHandle);
 
@@ -594,20 +601,25 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 	}
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadeShadowMap->GetResource(),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+																		  D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void Renderer::DrawSkybox(GraphicsCommandList commandList)
 {
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("skybox").Get());
+	struct SkyBoxRenderResource
+	{
+		UINT TexIndex;
+	};
+
+	SkyBoxRenderResource skyBoxRenderResource{m_EnvironmentMap->GetEnvMap().Srv.Index};
+
 	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("skybox").Get());
 
 	// Set pass constant buffer
 	auto passCB = CurrFrameResource()->PassCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-	// Bind Sky Cupe Map Texture
-	commandList->SetGraphicsRootDescriptorTable(2, m_EnvironmentMap->GetEnvMap().Srv.GPUHandle);
+	commandList->SetGraphicsRoot32BitConstants(2, 1, reinterpret_cast<void *>(&skyBoxRenderResource), 0);
 
 	commandList->IASetVertexBuffers(0, 1, &m_Skybox->VertexBufferView());
 	commandList->IASetIndexBuffer(&m_Skybox->IndexBufferView());
@@ -622,10 +634,10 @@ void Renderer::VelocityBufferPass(GraphicsCommandList commandList)
 	commandList->RSSetScissorRects(1, &m_ScissorRect);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VelocityBuffer.Resource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
+																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// Clear the background
-	commandList->ClearRenderTargetView(m_VelocityBuffer.Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
+	commandList->ClearRenderTargetView(m_VelocityBuffer.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 1.0f}, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	commandList->OMSetRenderTargets(1, &m_VelocityBuffer.Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
@@ -640,7 +652,7 @@ void Renderer::VelocityBufferPass(GraphicsCommandList commandList)
 	DrawRenderItems(commandList, RenderPass::Velocity);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VelocityBuffer.Resource.Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
+																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 }
 
 void Renderer::ClearVoxel(GraphicsCommandList commandList)
@@ -685,7 +697,7 @@ void Renderer::VoxelizeScene(GraphicsCommandList commandList)
 
 void Renderer::DebugVoxel(GraphicsCommandList commandList)
 {
-	commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
+	commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 1.0f}, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	commandList->RSSetViewports(1, &m_ScreenViewport);
@@ -788,7 +800,7 @@ void Renderer::OnMouseInput(int dxPixel, int dyPixel)
 // Update Logics
 //
 
-void Renderer::UpdateLights(Timer& timer)
+void Renderer::UpdateLights(Timer &timer)
 {
 	m_Lights[0].DirectionWS = CalcSunDir(g_RenderingSettings.SunTheta, g_RenderingSettings.SunPhi);
 	m_Lights[0].Intensity = g_RenderingSettings.SunLightIntensity;
@@ -799,7 +811,7 @@ void Renderer::UpdateLights(Timer& timer)
 
 	for (int i = 0; i < m_Lights.size(); i++)
 	{
-		auto& light = m_Lights[i];
+		auto &light = m_Lights[i];
 		light.PositionWS.x += XMScalarCos(timer.TotalTime() * 2) * timer.DeltaTime() * 3;
 
 		auto PositionWS = XMLoadFloat4(&light.PositionWS);
@@ -816,11 +828,11 @@ void Renderer::UpdateObjectConstantBuffers()
 {
 	auto objectCB = CurrFrameResource()->ObjectCB.get();
 
-	for (auto& ritem : m_RenderItems)
+	for (auto &ritem : m_RenderItems)
 	{
 		//// Only update the cbuffer data if the constants have changed.
 		//// This needs to be tracked per frame resource.
-		//if (ritem->NumFramesDirty > 0)
+		// if (ritem->NumFramesDirty > 0)
 		//{
 		//	XMMATRIX world = XMLoadFloat4x4(&ritem->World);
 
@@ -850,14 +862,14 @@ void Renderer::UpdateObjectConstantBuffers()
 	}
 }
 
-void Renderer::UpdateMainPassConstantBuffer(Timer& timer)
+void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 {
 	float haltonX = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 2) - 1.0f;
 	float haltonY = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 3) - 1.0f;
 	float jitterX = (haltonX / m_Width);
 	float jitterY = (haltonY / m_Height);
-	//jitterX = 0.0f;
-	//jitterY = 0.0f;
+	// jitterX = 0.0f;
+	// jitterY = 0.0f;
 
 	XMMATRIX view = m_Camera.GetView();
 	XMMATRIX proj = m_Camera.GetProj();
@@ -995,8 +1007,8 @@ void Renderer::OnResize(UINT width, UINT height)
 	ResizeResources();
 	BuildDescriptors();
 
-	m_ScreenViewport = { 0, 0, (float)width, float(height), 0.0f, 1.0f };
-	m_ScissorRect = { 0, 0, (long)width, (long)height };
+	m_ScreenViewport = {0, 0, (float)width, float(height), 0.0f, 1.0f};
+	m_ScissorRect = {0, 0, (long)width, (long)height};
 	m_Camera.SetLens(0.25f * MathHelper::Pi, (float)width / height, 1.0f, 1000.0f);
 
 	m_SSAO->OnResize(width, height);

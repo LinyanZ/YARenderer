@@ -1,3 +1,6 @@
+#include "renderResources.hlsl"
+#include "samplers.hlsl"
+
 cbuffer cbPass : register(b1)
 {
     float4x4 gView;
@@ -20,9 +23,7 @@ cbuffer cbPass : register(b1)
     float2 gPreviousJitter;
 };
 
-TextureCube gCubeMap : register(t0);
-
-SamplerState gsamLinearWrap : register(s0);
+ConstantBuffer<SkyBoxRenderResources> g_Resources : register(b2);
 
 struct VertexIn
 {
@@ -56,5 +57,6 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    return gCubeMap.SampleLevel(gsamLinearWrap, pin.PosL, 0);
+    TextureCube envMap = ResourceDescriptorHeap[g_Resources.EnvMapTexIndex];
+    return envMap.SampleLevel(g_SamplerLinearWrap, pin.PosL, 0);
 }

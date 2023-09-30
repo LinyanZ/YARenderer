@@ -19,7 +19,7 @@ struct DescriptorHeap
 	Descriptor Alloc()
 	{
 		ASSERT(Size < Capacity, "Exceeding heap size.");
-		Descriptor desc{GetCPUHandle(Size), GetGPUHandle(Size)};
+		Descriptor desc{Size, GetCPUHandle(Size), GetGPUHandle(Size)};
 		Size++;
 		return desc;
 	}

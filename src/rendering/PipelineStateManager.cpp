@@ -55,6 +55,26 @@ void PipelineStateManager::BuildShadersAndInputLayouts()
 
 void PipelineStateManager::BuildRootSignatures()
 {
+	// universal root signature
+	{
+		UINT MaxNumConstants = 32; // temporary limit
+
+		auto staticSamplers = GetStaticSamplers();
+
+		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
+		slotRootParameter[0].InitAsConstantBufferView(0); // object constant buffer
+		slotRootParameter[1].InitAsConstantBufferView(1); // pass constant buffer
+		slotRootParameter[2].InitAsConstants(MaxNumConstants, 2);
+
+		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter,
+										 staticSamplers.size(), staticSamplers.data(),
+										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+											 D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+											 D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
+
+		m_RootSignatures["universal"] = Utils::CreateRootSignature(m_Device, desc);
+	}
+
 	// draw normal
 	{
 		CD3DX12_DESCRIPTOR_RANGE descriptorRanges[] =
@@ -239,25 +259,6 @@ void PipelineStateManager::BuildRootSignatures()
 										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		m_RootSignatures["deferredRenderingLightingPass1"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
-	// skybox root signature
-	{
-		CD3DX12_DESCRIPTOR_RANGE texTable;
-		texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-		slotRootParameter[0].InitAsConstantBufferView(0);										 // pass constant buffer
-		slotRootParameter[1].InitAsConstantBufferView(1);										 // pass constant buffer
-		slotRootParameter[2].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // cube map texture
-
-		auto staticSamplers = GetStaticSamplers();
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter,
-										 1, staticSamplers.data(),
-										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		m_RootSignatures["skybox"] = Utils::CreateRootSignature(m_Device, desc);
 	}
 
 	// velocity buffer
@@ -569,7 +570,7 @@ void PipelineStateManager::BuildPSOs()
 		{
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC skyboxDesc = desc;
 			skyboxDesc.InputLayout = {m_InputLayouts["skybox"].data(), (UINT)m_InputLayouts["skybox"].size()};
-			skyboxDesc.pRootSignature = m_RootSignatures["skybox"].Get();
+			skyboxDesc.pRootSignature = m_RootSignatures["universal"].Get();
 			skyboxDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["skybox"]->GetBufferPointer(), m_VSByteCodes["skybox"]->GetBufferSize());
 			skyboxDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["skybox"]->GetBufferPointer(), m_PSByteCodes["skybox"]->GetBufferSize());
 
@@ -708,12 +709,61 @@ void PipelineStateManager::BuildPSOs()
 
 std::vector<CD3DX12_STATIC_SAMPLER_DESC> PipelineStateManager::GetStaticSamplers()
 {
-	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
 		0,								  // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT,	  // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
+		1,								   // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT,	   // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		2,								  // shaderRegister
 		D3D12_FILTER_MIN_MAG_MIP_LINEAR,  // filter
 		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
 		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
 		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
 
-	return {linearWrap};
+	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
+		3,								   // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR,   // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
+		4,								  // shaderRegister
+		D3D12_FILTER_ANISOTROPIC,		  // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
+		5,								   // shaderRegister
+		D3D12_FILTER_ANISOTROPIC,		   // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	CD3DX12_STATIC_SAMPLER_DESC shadow(
+		6,										   // shaderRegister
+		D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressW
+		0.0f,									   // mipLODBias
+		16,										   // maxAnisotropy
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
+
+	return {pointWrap, pointClamp,
+			linearWrap, linearClamp,
+			anisotropicWrap, anisotropicClamp,
+			shadow};
 }
