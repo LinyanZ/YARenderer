@@ -1,31 +1,53 @@
 #include "Utils.h"
-#include "dxcapi.h"
 
-Blob Utils::CompileShader(const std::wstring &filename, const D3D_SHADER_MACRO *defines, const std::string &entrypoint, const std::string &target)
+static ComPtr<IDxcUtils> g_DxcUtils = nullptr;
+static ComPtr<IDxcCompiler3> g_DxcCompiler = nullptr;
+static ComPtr<IDxcIncludeHandler> g_DxcIncludeHandler = nullptr;
+
+Shader Utils::CompileShader(const std::wstring &filename, const D3D_SHADER_MACRO *defines, const std::wstring &entrypoint, const std::wstring &target)
 {
-	ComPtr<IDxcUtils> pUtils;
-	ComPtr<IDxcCompiler3> pCompiler;
-	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&pUtils));
-	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler));
+	if (!g_DxcUtils)
+	{
+		ThrowIfFailed(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&g_DxcUtils)));
+		ThrowIfFailed(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&g_DxcCompiler)));
+		ThrowIfFailed(g_DxcUtils->CreateDefaultIncludeHandler(&g_DxcIncludeHandler));
+	}
 
-	UINT compileFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)
-	compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
+	std::vector<LPCWSTR> compilationArguments = {
+		L"-E", entrypoint.data(),
+		L"-T", target.data(),
+		L"-I", L"shaders/",
+		DXC_ARG_DEBUG,
+		DXC_ARG_WARNINGS_ARE_ERRORS};
 
-	HRESULT hr = S_OK;
+	ComPtr<IDxcBlobEncoding> pSource = nullptr;
+	g_DxcUtils->LoadFile(filename.data(), nullptr, &pSource);
 
-	Blob byteCode = nullptr;
-	Blob errors;
-	hr = D3DCompileFromFile(filename.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-							entrypoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
+	DxcBuffer source;
+	source.Ptr = pSource->GetBufferPointer();
+	source.Size = pSource->GetBufferSize();
+	source.Encoding = DXC_CP_ACP;
 
-	if (errors != nullptr)
-		OutputDebugStringA((char *)errors->GetBufferPointer());
+	ComPtr<IDxcResult> result;
+	const HRESULT hr = g_DxcCompiler->Compile(
+		&source,
+		compilationArguments.data(),
+		(UINT32)compilationArguments.size(),
+		g_DxcIncludeHandler.Get(),
+		IID_PPV_ARGS(&result));
+
+	ComPtr<IDxcBlobUtf8> errors = nullptr;
+	result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr);
+
+	if (errors != nullptr && errors->GetStringLength() != 0)
+		LOG_ERROR("Warnings and Errors: {}", errors->GetStringPointer());
 
 	ThrowIfFailed(hr);
 
-	return byteCode;
+	Shader shader = nullptr;
+	result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shader), nullptr);
+
+	return shader;
 }
 
 RootSignature Utils::CreateRootSignature(

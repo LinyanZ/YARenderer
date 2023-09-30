@@ -68,7 +68,7 @@ PixelOut PS(VertexOut pin)
     PixelOut pout;
     
     // Albedo Color
-    float3 albedo = Mat.Albedo;
+    float3 albedo = Mat.Albedo.rgb;
     if (Mat.HasAlbedoTexture)
     {
         float3 albedoTex = AlbedoTexture.Sample(defaultSampler, pin.TexCoord).rgb;

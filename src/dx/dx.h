@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pch.h"
+#include <dxcapi.h>
 
 const int NUM_FRAMES_IN_FLIGHT = 3;
 const DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -21,6 +22,7 @@ typedef ComPtr<IDXGIAdapter4> Adapter;
 typedef ComPtr<IDXGISwapChain> SwapChain;
 typedef ComPtr<ID3D12Resource> Resource;
 typedef ComPtr<ID3DBlob> Blob;
+typedef ComPtr<IDxcBlob> Shader;
 typedef ComPtr<ID3D12PipelineState> PipelineState;
 typedef ComPtr<ID3D12RootSignature> RootSignature;
 typedef ComPtr<ID3D12CommandAllocator> CommandAllocator;

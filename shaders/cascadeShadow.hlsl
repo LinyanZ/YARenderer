@@ -2,7 +2,7 @@
 
 #define SHADOW_MAP_SIZE 4096
 #define NUM_CASCADES 4
-#define MAM_SAMPLES 64
+#define MAX_SAMPLES 64
 #define LIGHT_SIZE 0.04
 #define MIN_FILTER_RADIUS (2.0 / SHADOW_MAP_SIZE)
 #define NUM_RINGS 10
@@ -23,7 +23,7 @@ struct ShadowData
     int NumSamples;
 };
 
-static float2 g_SampleOffsets[MAM_SAMPLES];
+static float2 g_SampleOffsets[MAX_SAMPLES];
 
 float Random(float2 seed)
 {
@@ -149,9 +149,20 @@ float PCSS(Texture2DArray cascadeShadowMap, int cascadeIndex, SamplerComparisonS
 float2 CascadeShadowWithPCSS(Texture2DArray cascadeShadowMap, SamplerComparisonState shadowSampler, SamplerState pointSampler, 
                             float3 positionV, ShadowData shadowData, float4x4 invView)
 {
+    float ends[] = {
+        shadowData.CascadeEnds[0].x,
+        shadowData.CascadeEnds[0].y,
+        shadowData.CascadeEnds[0].z,
+        shadowData.CascadeEnds[0].w,
+        shadowData.CascadeEnds[1].x,
+        shadowData.CascadeEnds[1].y,
+        shadowData.CascadeEnds[1].z,
+        shadowData.CascadeEnds[1].w,
+    };
+
     int cascadeIndex = -1;
     for (int i = NUM_CASCADES - 1; i >= 0; i--)
-        if (positionV.z < ((float[8]) shadowData.CascadeEnds)[i + 1])
+        if (positionV.z < ends[i + 1])
             cascadeIndex = i;
     
     float shadowFactor = 1.0f;
@@ -164,8 +175,8 @@ float2 CascadeShadowWithPCSS(Texture2DArray cascadeShadowMap, SamplerComparisonS
         // blend between current and the next cascade
         if (cascadeIndex + 1 < NUM_CASCADES)
         {
-            float currentCascadeNear = ((float[8]) shadowData.CascadeEnds)[cascadeIndex];
-            float currentCascadeFar = ((float[8]) shadowData.CascadeEnds)[cascadeIndex + 1];
+            float currentCascadeNear = ends[cascadeIndex];
+            float currentCascadeFar = ends[cascadeIndex + 1];
             float currentCascadeLength = currentCascadeFar - currentCascadeNear;
             
             float transitionLength = currentCascadeLength * shadowData.TransitionRatio;

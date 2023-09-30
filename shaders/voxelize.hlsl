@@ -197,10 +197,10 @@ void GS(triangle GeometryInOut input[3], inout TriangleStream<GeometryInOut> tri
         switch (maxI)
         {
             case 0:
-                output[i].PositionH.xyz = float4(output[i].PositionH.yzx, 1.0f);
+                output[i].PositionH.xyz = float4(output[i].PositionH.yzx, 1.0f).xyz;
                 break;
             case 1:
-                output[i].PositionH.xyz = float4(output[i].PositionH.zxy, 1.0f);
+                output[i].PositionH.xyz = float4(output[i].PositionH.zxy, 1.0f).xyz;
                 break;
             case 2:
                 //output[i].PositionH.xyz = float4(output[i].PositionH.xyz, 1.0f);
@@ -310,9 +310,20 @@ void PS(GeometryInOut pin)
         // Direct lighting calculation for analytical lights (performed in view space)
         // 
         
+        float ends[] = {
+            gShadowData.CascadeEnds[0].x,
+            gShadowData.CascadeEnds[0].y,
+            gShadowData.CascadeEnds[0].z,
+            gShadowData.CascadeEnds[0].w,
+            gShadowData.CascadeEnds[1].x,
+            gShadowData.CascadeEnds[1].y,
+            gShadowData.CascadeEnds[1].z,
+            gShadowData.CascadeEnds[1].w,
+        };
+
         int cascadeIndex = -1;
         for (int i = NUM_CASCADES - 1; i >= 0; i--)
-            if (pin.PositionV.z < ((float[8]) gShadowData.CascadeEnds)[i + 1])
+            if (pin.PositionV.z < ends[i + 1])
                 cascadeIndex = i;
     
         float shadowFactor = 1.0f;

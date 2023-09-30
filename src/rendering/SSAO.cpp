@@ -15,8 +15,8 @@ SSAO::SSAO(Ref<DxContext> dxContext, UINT width, UINT height)
 	AllocateDescriptors(dxContext->GetRtvHeap(), dxContext->GetCbvSrvUavHeap());
 	BuildDescriptors();
 
-	m_Viewport = { 0.0f, 0.0f, (float)m_RenderTargetWidth / 2 , (float)m_RenderTargetHeight / 2 , 0.0f, 1.0f };
-	m_ScissorRect = { 0, 0, (int)m_RenderTargetWidth / 2, (int)m_RenderTargetHeight / 2 };
+	m_Viewport = {0.0f, 0.0f, (float)m_RenderTargetWidth / 2, (float)m_RenderTargetHeight / 2, 0.0f, 1.0f};
+	m_ScissorRect = {0, 0, (int)m_RenderTargetWidth / 2, (int)m_RenderTargetHeight / 2};
 }
 
 std::vector<float> SSAO::CalcGaussWeights(float sigma)
@@ -52,7 +52,7 @@ std::vector<float> SSAO::CalcGaussWeights(float sigma)
 	return weights;
 }
 
-void SSAO::AllocateDescriptors(DescriptorHeap& GetRtvHeap, DescriptorHeap& SrvHeap)
+void SSAO::AllocateDescriptors(DescriptorHeap &GetRtvHeap, DescriptorHeap &SrvHeap)
 {
 	m_AmbientMap0.Srv = SrvHeap.Alloc();
 	m_AmbientMap1.Srv = SrvHeap.Alloc();
@@ -75,8 +75,8 @@ void SSAO::OnResize(UINT width, UINT height)
 	m_RenderTargetWidth = width;
 	m_RenderTargetHeight = height;
 
-	m_Viewport = { 0.0f, 0.0f, (float)m_RenderTargetWidth / 2 , (float)m_RenderTargetHeight / 2 , 0.0f, 1.0f };
-	m_ScissorRect = { 0, 0, (int)m_RenderTargetWidth / 2, (int)m_RenderTargetHeight / 2 };
+	m_Viewport = {0.0f, 0.0f, (float)m_RenderTargetWidth / 2, (float)m_RenderTargetHeight / 2, 0.0f, 1.0f};
+	m_ScissorRect = {0, 0, (int)m_RenderTargetWidth / 2, (int)m_RenderTargetHeight / 2};
 
 	m_AmbientMap0.Resize(m_Device, width / 2, height / 2);
 	m_AmbientMap1.Resize(m_Device, width / 2, height / 2);
@@ -84,7 +84,7 @@ void SSAO::OnResize(UINT width, UINT height)
 	BuildDescriptors();
 }
 
-void SSAO::ComputeSSAO(GraphicsCommandList cmdList, Texture normalMap, Descriptor depthMapSrv, FrameResource* currFrame, int blurCount)
+void SSAO::ComputeSSAO(GraphicsCommandList cmdList, Texture normalMap, Descriptor depthMapSrv, FrameResource *currFrame, int blurCount)
 {
 	cmdList->RSSetViewports(1, &m_Viewport);
 	cmdList->RSSetScissorRects(1, &m_ScissorRect);
@@ -93,9 +93,9 @@ void SSAO::ComputeSSAO(GraphicsCommandList cmdList, Texture normalMap, Descripto
 
 	// Change to RENDER_TARGET.
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_AmbientMap0.Resource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
+																	  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	float clearValue[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	float clearValue[] = {1.0f, 1.0f, 1.0f, 1.0f};
 	cmdList->ClearRenderTargetView(m_AmbientMap0.Rtv.CPUHandle, clearValue, 0, nullptr);
 
 	// Specify the buffers we are going to render to.
@@ -121,12 +121,12 @@ void SSAO::ComputeSSAO(GraphicsCommandList cmdList, Texture normalMap, Descripto
 
 	// Change back to GENERIC_READ so we can read the texture in a shader.
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_AmbientMap0.Resource.Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
+																	  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 
 	BlurAmbientMap(cmdList, normalMap, currFrame, blurCount);
 }
 
-void SSAO::BlurAmbientMap(GraphicsCommandList cmdList, Texture normalMap, FrameResource* currFrame, int blurCount)
+void SSAO::BlurAmbientMap(GraphicsCommandList cmdList, Texture normalMap, FrameResource *currFrame, int blurCount)
 {
 	cmdList->SetPipelineState(m_BlurPso.Get());
 
@@ -142,7 +142,7 @@ void SSAO::BlurAmbientMap(GraphicsCommandList cmdList, Texture normalMap, FrameR
 
 void SSAO::BlurAmbientMap(GraphicsCommandList cmdList, Texture normalMap, bool horzBlur)
 {
-	ID3D12Resource* output = nullptr;
+	ID3D12Resource *output = nullptr;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE inputSrv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE outputRtv;
 
@@ -164,9 +164,9 @@ void SSAO::BlurAmbientMap(GraphicsCommandList cmdList, Texture normalMap, bool h
 	}
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(output,
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
+																	  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	float clearValue[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	float clearValue[] = {1.0f, 1.0f, 1.0f, 1.0f};
 	cmdList->ClearRenderTargetView(outputRtv, clearValue, 0, nullptr);
 
 	cmdList->OMSetRenderTargets(1, &outputRtv, true, nullptr);
@@ -186,7 +186,7 @@ void SSAO::BlurAmbientMap(GraphicsCommandList cmdList, Texture normalMap, bool h
 	cmdList->DrawInstanced(6, 1, 0, 0);
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(output,
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
+																	  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 }
 
 void SSAO::BuildRootSignature()
@@ -211,43 +211,42 @@ void SSAO::BuildRootSignature()
 	slotRootParameter[4].InitAsDescriptorTable(1, &texTable2, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
-		0, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+		0,								   // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT,	   // filter
 		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
 		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
 		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
 
 	const CD3DX12_STATIC_SAMPLER_DESC depthMapSam(
-		1, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
+		1,								   // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR,   // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER, // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER, // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER, // addressW
 		0.0f,
 		0,
 		D3D12_COMPARISON_FUNC_LESS_EQUAL,
 		D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE);
 
 	std::array<CD3DX12_STATIC_SAMPLER_DESC, 2> staticSamplers =
-	{
-		pointClamp, depthMapSam
-	};
+		{
+			pointClamp, depthMapSam};
 
 	// A root signature is an array of root parameters.
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(5, slotRootParameter,
-		(UINT)staticSamplers.size(), staticSamplers.data(),
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+											(UINT)staticSamplers.size(), staticSamplers.data(),
+											D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	m_SSAORootSig = Utils::CreateRootSignature(m_Device, rootSigDesc);
 }
 
 void SSAO::BuildPSOs()
 {
-	auto ssaoVSByteCode = Utils::CompileShader(L"Shaders\\ssao.hlsl", nullptr, "VS", "vs_5_1");
-	auto ssaoPSByteCode = Utils::CompileShader(L"Shaders\\ssao.hlsl", nullptr, "PS", "ps_5_1");
+	Shader ssaoVSByteCode = Utils::CompileShader(L"Shaders\\ssao.hlsl", nullptr, L"VS", L"vs_6_6");
+	Shader ssaoPSByteCode = Utils::CompileShader(L"Shaders\\ssao.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	auto ssaoBlurVSByteCode = Utils::CompileShader(L"Shaders\\ssaoBlur.hlsl", nullptr, "VS", "vs_5_1");
-	auto ssaoBlurPSByteCode = Utils::CompileShader(L"Shaders\\ssaoBlur.hlsl", nullptr, "PS", "ps_5_1");
+	Shader ssaoBlurVSByteCode = Utils::CompileShader(L"Shaders\\ssaoBlur.hlsl", nullptr, L"VS", L"vs_6_6");
+	Shader ssaoBlurPSByteCode = Utils::CompileShader(L"Shaders\\ssaoBlur.hlsl", nullptr, L"PS", L"ps_6_6");
 
 	//
 	// PSO for SSAO.
@@ -260,11 +259,11 @@ void SSAO::BuildPSOs()
 	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	desc.NumRenderTargets = 1;
 	desc.RTVFormats[0] = AMBIENT_MAP_FORMAT;
-	desc.SampleDesc = { 1, 0 };
-	desc.InputLayout = { nullptr, 0 };
+	desc.SampleDesc = {1, 0};
+	desc.InputLayout = {nullptr, 0};
 	desc.pRootSignature = m_SSAORootSig.Get();
-	desc.VS = CD3DX12_SHADER_BYTECODE(ssaoVSByteCode.Get());
-	desc.PS = CD3DX12_SHADER_BYTECODE(ssaoPSByteCode.Get());
+	desc.VS = CD3DX12_SHADER_BYTECODE(ssaoVSByteCode->GetBufferPointer(), ssaoVSByteCode->GetBufferSize());
+	desc.PS = CD3DX12_SHADER_BYTECODE(ssaoPSByteCode->GetBufferPointer(), ssaoPSByteCode->GetBufferSize());
 
 	// SSAO effect does not need the depth buffer.
 	desc.DepthStencilState.DepthEnable = false;
@@ -276,8 +275,8 @@ void SSAO::BuildPSOs()
 	//
 	// PSO for SSAO blur.
 	//
-	desc.VS = CD3DX12_SHADER_BYTECODE(ssaoBlurVSByteCode.Get());
-	desc.PS = CD3DX12_SHADER_BYTECODE(ssaoBlurPSByteCode.Get());
+	desc.VS = CD3DX12_SHADER_BYTECODE(ssaoBlurVSByteCode->GetBufferPointer(), ssaoBlurVSByteCode->GetBufferSize());
+	desc.PS = CD3DX12_SHADER_BYTECODE(ssaoBlurPSByteCode->GetBufferPointer(), ssaoBlurPSByteCode->GetBufferSize());
 
 	ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_BlurPso)));
 }

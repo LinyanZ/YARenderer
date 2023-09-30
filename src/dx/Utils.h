@@ -6,16 +6,16 @@
 class Utils
 {
 public:
-	static Blob CompileShader(
-		const std::wstring& filename, const D3D_SHADER_MACRO* defines,
-		const std::string& entrypoint, const std::string& target);
+	static Shader CompileShader(
+		const std::wstring &filename, const D3D_SHADER_MACRO *defines,
+		const std::wstring &entrypoint, const std::wstring &target);
 
 	static RootSignature CreateRootSignature(
-		Device device, CD3DX12_ROOT_SIGNATURE_DESC& desc);
+		Device device, CD3DX12_ROOT_SIGNATURE_DESC &desc);
 
 	static Resource CreateDefaultBuffer(
 		Device device, GraphicsCommandList commandList,
-		const void* initData, UINT64 byteSize, Resource& uploadBuffer);
+		const void *initData, UINT64 byteSize, Resource &uploadBuffer);
 
 	static UINT CalcConstantBufferByteSize(UINT byteSize)
 	{

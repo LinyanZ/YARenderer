@@ -14,30 +14,30 @@ PipelineStateManager::PipelineStateManager(Device device)
 
 void PipelineStateManager::BuildShadersAndInputLayouts()
 {
-	m_VSByteCodes["default"] = Utils::CompileShader(L"shaders\\defaultVS.hlsl", nullptr, "VS", "vs_5_0");
+	m_VSByteCodes["default"] = Utils::CompileShader(L"shaders\\defaultVS.hlsl", nullptr, L"VS", L"vs_6_6");
 
-	m_PSByteCodes["drawNormal"] = Utils::CompileShader(L"shaders\\drawNormal.hlsl", nullptr, "PS", "ps_5_0");
-	m_PSByteCodes["forwardRendering"] = Utils::CompileShader(L"shaders\\forwardRendering.hlsl", nullptr, "PS", "ps_5_0");
+	m_PSByteCodes["drawNormal"] = Utils::CompileShader(L"shaders\\drawNormal.hlsl", nullptr, L"PS", L"ps_6_6");
+	m_PSByteCodes["forwardRendering"] = Utils::CompileShader(L"shaders\\forwardRendering.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["shadow"] = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, "VS", "vs_5_0");
-	m_PSByteCodes["shadow"] = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, "PS", "ps_5_0");
+	m_VSByteCodes["shadow"] = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, L"VS", L"vs_6_6");
+	m_PSByteCodes["shadow"] = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["velocityBuffer"] = Utils::CompileShader(L"shaders\\velocityBuffer.hlsl", nullptr, "VS", "vs_5_0");
-	m_PSByteCodes["velocityBuffer"] = Utils::CompileShader(L"shaders\\velocityBuffer.hlsl", nullptr, "PS", "ps_5_0");
+	m_VSByteCodes["velocityBuffer"] = Utils::CompileShader(L"shaders\\velocityBuffer.hlsl", nullptr, L"VS", L"vs_6_6");
+	m_PSByteCodes["velocityBuffer"] = Utils::CompileShader(L"shaders\\velocityBuffer.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_PSByteCodes["gbuffer"] = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, "PS", "ps_5_0");
+	m_PSByteCodes["gbuffer"] = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassVS.hlsl", nullptr, "VS", "vs_5_0");
-	m_PSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassPS.hlsl", nullptr, "PS", "ps_5_0");
+	m_VSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassVS.hlsl", nullptr, L"VS", L"vs_6_6");
+	m_PSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassPS.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, "VS", "vs_5_0");
-	m_PSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, "PS", "ps_5_0");
+	m_VSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, L"VS", L"vs_6_6");
+	m_PSByteCodes["deferredAmbientLight"] = Utils::CompileShader(L"shaders\\deferredAmbientLight.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, "VS", "vs_5_0");
-	m_PSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, "PS", "ps_5_0");
+	m_VSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"VS", L"vs_6_6");
+	m_PSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"PS", L"ps_6_6");
 
-	m_VSByteCodes["skybox"] = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, "VS", "vs_5_0");
-	m_PSByteCodes["skybox"] = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, "PS", "ps_5_0");
+	m_VSByteCodes["skybox"] = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, L"VS", L"vs_6_6");
+	m_PSByteCodes["skybox"] = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, L"PS", L"ps_6_6");
 
 	m_InputLayouts["default"] =
 		{
@@ -423,8 +423,8 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC forwardRenderingDesc = desc;
 			forwardRenderingDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			forwardRenderingDesc.pRootSignature = m_RootSignatures["forwardRendering"].Get();
-			forwardRenderingDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"].Get());
-			forwardRenderingDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["forwardRendering"].Get());
+			forwardRenderingDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"]->GetBufferPointer(), m_VSByteCodes["default"]->GetBufferSize());
+			forwardRenderingDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["forwardRendering"]->GetBufferPointer(), m_PSByteCodes["forwardRendering"]->GetBufferSize());
 
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&forwardRenderingDesc, IID_PPV_ARGS(&m_PSOs["forwardRendering"])));
 
@@ -449,8 +449,8 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPassDesc = desc;
 			shadowPassDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			shadowPassDesc.pRootSignature = m_RootSignatures["shadow"].Get();
-			shadowPassDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["shadow"].Get());
-			shadowPassDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["shadow"].Get());
+			shadowPassDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["shadow"]->GetBufferPointer(), m_VSByteCodes["shadow"]->GetBufferSize());
+			shadowPassDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["shadow"]->GetBufferPointer(), m_PSByteCodes["shadow"]->GetBufferSize());
 
 			shadowPassDesc.RasterizerState.DepthBias = 100000;
 			shadowPassDesc.RasterizerState.DepthBiasClamp = 10.0f;
@@ -467,8 +467,8 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC gbufferDesc = desc;
 			gbufferDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			gbufferDesc.pRootSignature = m_RootSignatures["gbuffer"].Get();
-			gbufferDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"].Get());
-			gbufferDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["gbuffer"].Get());
+			gbufferDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"]->GetBufferPointer(), m_VSByteCodes["default"]->GetBufferSize());
+			gbufferDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["gbuffer"]->GetBufferPointer(), m_PSByteCodes["gbuffer"]->GetBufferSize());
 			gbufferDesc.NumRenderTargets = 5;
 			gbufferDesc.RTVFormats[0] = GBUFFER_ALBEDO_FORMAT;
 			gbufferDesc.RTVFormats[1] = GBUFFER_NORMAL_FORMAT;
@@ -484,8 +484,8 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredAmbientDesc = desc;
 			deferredAmbientDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			deferredAmbientDesc.pRootSignature = m_RootSignatures["deferredAmbientLight"].Get();
-			deferredAmbientDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["deferredAmbientLight"].Get());
-			deferredAmbientDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["deferredAmbientLight"].Get());
+			deferredAmbientDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["deferredAmbientLight"]->GetBufferPointer(), m_VSByteCodes["deferredAmbientLight"]->GetBufferSize());
+			deferredAmbientDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["deferredAmbientLight"]->GetBufferPointer(), m_PSByteCodes["deferredAmbientLight"]->GetBufferSize());
 			deferredAmbientDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 			deferredAmbientDesc.DepthStencilState.DepthEnable = false;
 
@@ -497,7 +497,7 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredLightingPass0 = desc;
 			deferredLightingPass0.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			deferredLightingPass0.pRootSignature = m_RootSignatures["deferredRenderingLightingPass0"].Get();
-			deferredLightingPass0.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["lightingPass"].Get());
+			deferredLightingPass0.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["lightingPass"]->GetBufferPointer(), m_VSByteCodes["lightingPass"]->GetBufferSize());
 			// Only write to depth/stencil buffer, so no pixel shader is bound.
 
 			// Only render the front faces of the light volumes.
@@ -526,8 +526,8 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredLightingPass1 = desc;
 			deferredLightingPass1.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			deferredLightingPass1.pRootSignature = m_RootSignatures["deferredRenderingLightingPass1"].Get();
-			deferredLightingPass1.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["lightingPass"].Get());
-			deferredLightingPass1.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["lightingPass"].Get());
+			deferredLightingPass1.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["lightingPass"]->GetBufferPointer(), m_VSByteCodes["lightingPass"]->GetBufferSize());
+			deferredLightingPass1.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["lightingPass"]->GetBufferPointer(), m_PSByteCodes["lightingPass"]->GetBufferSize());
 
 			// Only render the back faces of the light volumes.
 			deferredLightingPass1.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
@@ -570,8 +570,8 @@ void PipelineStateManager::BuildPSOs()
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC skyboxDesc = desc;
 			skyboxDesc.InputLayout = {m_InputLayouts["skybox"].data(), (UINT)m_InputLayouts["skybox"].size()};
 			skyboxDesc.pRootSignature = m_RootSignatures["skybox"].Get();
-			skyboxDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["skybox"].Get());
-			skyboxDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["skybox"].Get());
+			skyboxDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["skybox"]->GetBufferPointer(), m_VSByteCodes["skybox"]->GetBufferSize());
+			skyboxDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["skybox"]->GetBufferPointer(), m_PSByteCodes["skybox"]->GetBufferSize());
 
 			// camera is inside the skybox, so just turn off the culling
 			skyboxDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
@@ -589,8 +589,8 @@ void PipelineStateManager::BuildPSOs()
 			velocityDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			velocityDesc.pRootSignature = m_RootSignatures["velocityBuffer"].Get();
 			velocityDesc.RTVFormats[0] = VELOCITY_BUFFER_FORMAT;
-			velocityDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["velocityBuffer"].Get());
-			velocityDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["velocityBuffer"].Get());
+			velocityDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["velocityBuffer"]->GetBufferPointer(), m_VSByteCodes["velocityBuffer"]->GetBufferSize());
+			velocityDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["velocityBuffer"]->GetBufferPointer(), m_PSByteCodes["velocityBuffer"]->GetBufferSize());
 
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&velocityDesc, IID_PPV_ARGS(&m_PSOs["velocityBuffer"])));
 		}
@@ -601,8 +601,8 @@ void PipelineStateManager::BuildPSOs()
 			drawNormalDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 			drawNormalDesc.pRootSignature = m_RootSignatures["drawNormal"].Get();
 			drawNormalDesc.RTVFormats[0] = GBUFFER_NORMAL_FORMAT;
-			drawNormalDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"].Get());
-			drawNormalDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["drawNormal"].Get());
+			drawNormalDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"]->GetBufferPointer(), m_VSByteCodes["default"]->GetBufferSize());
+			drawNormalDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["drawNormal"]->GetBufferPointer(), m_PSByteCodes["drawNormal"]->GetBufferSize());
 
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&drawNormalDesc, IID_PPV_ARGS(&m_PSOs["drawNormal"])));
 		}
@@ -614,8 +614,8 @@ void PipelineStateManager::BuildPSOs()
 			debugPSO.DepthStencilState.DepthEnable = false;
 			debugPSO.pRootSignature = m_RootSignatures["debug"].Get();
 			debugPSO.RTVFormats[0] = BACK_BUFFER_FORMAT;
-			debugPSO.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["debug"].Get());
-			debugPSO.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["debug"].Get());
+			debugPSO.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["debug"]->GetBufferPointer(), m_VSByteCodes["debug"]->GetBufferSize());
+			debugPSO.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["debug"]->GetBufferPointer(), m_PSByteCodes["debug"]->GetBufferSize());
 
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&debugPSO, IID_PPV_ARGS(&m_PSOs["debug"])));
 		}
@@ -623,19 +623,19 @@ void PipelineStateManager::BuildPSOs()
 
 	// clear voxel
 	{
-		Blob byteCode = Utils::CompileShader(L"shaders\\clearVoxel.hlsl", nullptr, "main", "cs_5_0");
+		Shader byteCode = Utils::CompileShader(L"shaders\\clearVoxel.hlsl", nullptr, L"main", L"cs_6_6");
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.pRootSignature = m_RootSignatures["clearVoxel"].Get();
-		psoDesc.CS = CD3DX12_SHADER_BYTECODE(byteCode.Get());
+		psoDesc.CS = CD3DX12_SHADER_BYTECODE(byteCode->GetBufferPointer(), byteCode->GetBufferSize());
 		ThrowIfFailed(m_Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["clearVoxel"])));
 	}
 
 	// voxelizer
 	{
-		auto voxelVS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, "VS", "vs_5_0");
-		auto voxelGS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, "GS", "gs_5_0");
-		auto voxelPS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, "PS", "ps_5_0");
+		Shader voxelVS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"VS", L"vs_6_6");
+		Shader voxelGS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"GS", L"gs_6_6");
+		Shader voxelPS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"PS", L"ps_6_6");
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC voxelizeDesc = {};
 		voxelizeDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -652,18 +652,18 @@ void PipelineStateManager::BuildPSOs()
 		voxelizeDesc.SampleDesc = {1, 0};
 		voxelizeDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
 		voxelizeDesc.pRootSignature = m_RootSignatures["voxelize"].Get();
-		voxelizeDesc.VS = CD3DX12_SHADER_BYTECODE(voxelVS.Get());
-		voxelizeDesc.GS = CD3DX12_SHADER_BYTECODE(voxelGS.Get());
-		voxelizeDesc.PS = CD3DX12_SHADER_BYTECODE(voxelPS.Get());
+		voxelizeDesc.VS = CD3DX12_SHADER_BYTECODE(voxelVS->GetBufferPointer(), voxelVS->GetBufferSize());
+		voxelizeDesc.GS = CD3DX12_SHADER_BYTECODE(voxelGS->GetBufferPointer(), voxelGS->GetBufferSize());
+		voxelizeDesc.PS = CD3DX12_SHADER_BYTECODE(voxelPS->GetBufferPointer(), voxelPS->GetBufferSize());
 
 		ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&voxelizeDesc, IID_PPV_ARGS(&m_PSOs["voxelize"])));
 	}
 
 	// debug voxel
 	{
-		auto voxelVS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, "VS", "vs_5_0");
-		auto voxelGS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, "GS", "gs_5_0");
-		auto voxelPS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, "PS", "ps_5_0");
+		Shader voxelVS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"VS", L"vs_6_6");
+		Shader voxelGS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"GS", L"gs_6_6");
+		Shader voxelPS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"PS", L"ps_6_6");
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC voxelizeDesc = {};
 		voxelizeDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -678,30 +678,30 @@ void PipelineStateManager::BuildPSOs()
 		voxelizeDesc.DSVFormat = DEPTH_STENCIL_FORMAT;
 		voxelizeDesc.SampleDesc = {1, 0};
 		voxelizeDesc.pRootSignature = m_RootSignatures["voxelDebug"].Get();
-		voxelizeDesc.VS = CD3DX12_SHADER_BYTECODE(voxelVS.Get());
-		voxelizeDesc.GS = CD3DX12_SHADER_BYTECODE(voxelGS.Get());
-		voxelizeDesc.PS = CD3DX12_SHADER_BYTECODE(voxelPS.Get());
+		voxelizeDesc.VS = CD3DX12_SHADER_BYTECODE(voxelVS->GetBufferPointer(), voxelVS->GetBufferSize());
+		voxelizeDesc.GS = CD3DX12_SHADER_BYTECODE(voxelGS->GetBufferPointer(), voxelGS->GetBufferSize());
+		voxelizeDesc.PS = CD3DX12_SHADER_BYTECODE(voxelPS->GetBufferPointer(), voxelPS->GetBufferSize());
 
 		ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&voxelizeDesc, IID_PPV_ARGS(&m_PSOs["voxelDebug"])));
 	}
 
 	// voxel mipmap
 	{
-		Blob byteCode = Utils::CompileShader(L"shaders\\voxelMipmap.hlsl", nullptr, "main", "cs_5_0");
+		Shader shader = Utils::CompileShader(L"shaders\\voxelMipmap.hlsl", nullptr, L"main", L"cs_6_6");
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.pRootSignature = m_RootSignatures["voxelMipmap"].Get();
-		psoDesc.CS = CD3DX12_SHADER_BYTECODE(byteCode.Get());
+		psoDesc.CS = CD3DX12_SHADER_BYTECODE(shader->GetBufferPointer(), shader->GetBufferSize());
 		ThrowIfFailed(m_Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["voxelMipmap"])));
 	}
 
 	// voxel compute average
 	{
-		Blob byteCode = Utils::CompileShader(L"shaders\\voxelComputeAverage.hlsl", nullptr, "main", "cs_5_0");
+		Shader shader = Utils::CompileShader(L"shaders\\voxelComputeAverage.hlsl", nullptr, L"main", L"cs_6_6");
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.pRootSignature = m_RootSignatures["voxelMipmap"].Get();
-		psoDesc.CS = CD3DX12_SHADER_BYTECODE(byteCode.Get());
+		psoDesc.CS = CD3DX12_SHADER_BYTECODE(shader->GetBufferPointer(), shader->GetBufferSize());
 		ThrowIfFailed(m_Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["voxelComputeAverage"])));
 	}
 }

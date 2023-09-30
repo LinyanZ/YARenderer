@@ -9,11 +9,11 @@ void RenderingUtils::Init(Ref<DxContext> dxContext)
 {
 	Device device = dxContext->GetDevice();
 
-	Blob equirect2CubeByteCode = Utils::CompileShader(L"shaders\\equirect2cube.hlsl", nullptr, "main", "cs_5_0");
-	Blob irmapByteCode = Utils::CompileShader(L"shaders\\irmap.hlsl", nullptr, "main", "cs_5_0");
-	Blob spmapByteCode = Utils::CompileShader(L"shaders\\spmap.hlsl", nullptr, "main", "cs_5_0");
-	Blob spbrdfByteCode = Utils::CompileShader(L"shaders\\spbrdf.hlsl", nullptr, "main", "cs_5_0");
-	Blob mipmapByteCode = Utils::CompileShader(L"shaders\\downsample_array.hlsl", nullptr, "downsample_linear", "cs_5_0");
+	Shader equirect2CubeByteCode = Utils::CompileShader(L"shaders\\equirect2cube.hlsl", nullptr, L"main", L"cs_6_6");
+	Shader irmapByteCode = Utils::CompileShader(L"shaders\\irmap.hlsl", nullptr, L"main", L"cs_6_6");
+	Shader spmapByteCode = Utils::CompileShader(L"shaders\\spmap.hlsl", nullptr, L"main", L"cs_6_6");
+	Shader spbrdfByteCode = Utils::CompileShader(L"shaders\\spbrdf.hlsl", nullptr, L"main", L"cs_6_6");
+	Shader mipmapByteCode = Utils::CompileShader(L"shaders\\downsample_array.hlsl", nullptr, L"downsample_linear", L"cs_6_6");
 
 	// create universal compute shader root signature
 	{
@@ -27,11 +27,11 @@ void RenderingUtils::Init(Ref<DxContext> dxContext)
 		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable);
 		slotRootParameter[2].InitAsConstants(1, 0);
 
-		CD3DX12_STATIC_SAMPLER_DESC computeSamplerDesc{ 0, D3D12_FILTER_MIN_MAG_MIP_LINEAR };
+		CD3DX12_STATIC_SAMPLER_DESC computeSamplerDesc{0, D3D12_FILTER_MIN_MAG_MIP_LINEAR};
 
 		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter,
-			1, &computeSamplerDesc,
-			D3D12_ROOT_SIGNATURE_FLAG_NONE);
+										 1, &computeSamplerDesc,
+										 D3D12_ROOT_SIGNATURE_FLAG_NONE);
 
 		m_RootSignatures["compute"] = Utils::CreateRootSignature(device, desc);
 	}
@@ -48,7 +48,7 @@ void RenderingUtils::Init(Ref<DxContext> dxContext)
 		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable);
 
 		CD3DX12_ROOT_SIGNATURE_DESC desc(2, slotRootParameter,
-			0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+										 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
 
 		m_RootSignatures["mipmap"] = Utils::CreateRootSignature(device, desc);
 	}
@@ -58,24 +58,24 @@ void RenderingUtils::Init(Ref<DxContext> dxContext)
 	psoDesc.pRootSignature = m_RootSignatures["compute"].Get();
 
 	// equirect to cubemap
-	psoDesc.CS = CD3DX12_SHADER_BYTECODE(equirect2CubeByteCode.Get());
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(equirect2CubeByteCode->GetBufferPointer(), equirect2CubeByteCode->GetBufferSize());
 	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineStates["equirect2Cube"])));
 
 	// diffuse irradiance cubemap
-	psoDesc.CS = CD3DX12_SHADER_BYTECODE(irmapByteCode.Get());
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(irmapByteCode->GetBufferPointer(), irmapByteCode->GetBufferSize());
 	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineStates["irmap"])));
 
 	// pre-filtered specular environment map
-	psoDesc.CS = CD3DX12_SHADER_BYTECODE(spmapByteCode.Get());
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(spmapByteCode->GetBufferPointer(), spmapByteCode->GetBufferSize());
 	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineStates["spmap"])));
 
 	// BRDF 2D LUT
-	psoDesc.CS = CD3DX12_SHADER_BYTECODE(spbrdfByteCode.Get());
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(spbrdfByteCode->GetBufferPointer(), spbrdfByteCode->GetBufferSize());
 	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineStates["spbrdf"])));
 
 	// mipmap
 	psoDesc.pRootSignature = m_RootSignatures["mipmap"].Get();
-	psoDesc.CS = CD3DX12_SHADER_BYTECODE(mipmapByteCode.Get());
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(mipmapByteCode->GetBufferPointer(), mipmapByteCode->GetBufferSize());
 	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineStates["mipmap"])));
 }
 
@@ -85,13 +85,13 @@ void RenderingUtils::Cleanup()
 	m_PipelineStates.clear();
 }
 
-Texture RenderingUtils::ComputeDiffuseIrradianceCubemap(Ref<DxContext> dxContext, Texture& inputTex)
+Texture RenderingUtils::ComputeDiffuseIrradianceCubemap(Ref<DxContext> dxContext, Texture &inputTex)
 {
 	LOG_INFO("Computing diffuse irradiance cubemp...");
 
 	auto device = dxContext->GetDevice();
 	auto commandList = dxContext->GetCommandList();
-	auto& heap = dxContext->GetCbvSrvUavHeap();
+	auto &heap = dxContext->GetCbvSrvUavHeap();
 
 	Texture outputTex = Texture::Create(device, 32, 32, 6, DXGI_FORMAT_R32G32B32A32_FLOAT, 1);
 	outputTex.Srv = heap.Alloc();
@@ -102,9 +102,9 @@ Texture RenderingUtils::ComputeDiffuseIrradianceCubemap(Ref<DxContext> dxContext
 	outputTex.CreateUav(device, 0);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { heap.Heap.Get() };
+	ID3D12DescriptorHeap *descriptorHeaps[] = {heap.Heap.Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	commandList->SetPipelineState(m_PipelineStates["irmap"].Get());
@@ -114,7 +114,7 @@ Texture RenderingUtils::ComputeDiffuseIrradianceCubemap(Ref<DxContext> dxContext
 
 	commandList->Dispatch(outputTex.Width / 32, outputTex.Height / 32, 6);
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
+																		  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
 
 	dxContext->ExecuteCommandList();
 	dxContext->Flush();
@@ -122,13 +122,13 @@ Texture RenderingUtils::ComputeDiffuseIrradianceCubemap(Ref<DxContext> dxContext
 	return outputTex;
 }
 
-Texture RenderingUtils::ComputePrefilteredSpecularEnvironmentMap(Ref<DxContext> dxContext, Texture& inputTex)
+Texture RenderingUtils::ComputePrefilteredSpecularEnvironmentMap(Ref<DxContext> dxContext, Texture &inputTex)
 {
 	LOG_INFO("Computing pre-filtered specular environment map...");
 
 	auto device = dxContext->GetDevice();
 	auto commandList = dxContext->GetCommandList();
-	auto& heap = dxContext->GetCbvSrvUavHeap();
+	auto &heap = dxContext->GetCbvSrvUavHeap();
 
 	Texture outputTex = Texture::Create(device, 1024, 1024, 6, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	outputTex.Srv = heap.Alloc();
@@ -138,15 +138,15 @@ Texture RenderingUtils::ComputePrefilteredSpecularEnvironmentMap(Ref<DxContext> 
 
 	// copy 0th mipmap level into specular environment map
 	D3D12_RESOURCE_BARRIER preCopyBarriers[] =
-	{
-		CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST),
-		CD3DX12_RESOURCE_BARRIER::Transition(inputTex.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE),
-	};
+		{
+			CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST),
+			CD3DX12_RESOURCE_BARRIER::Transition(inputTex.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE),
+		};
 	D3D12_RESOURCE_BARRIER postCopyBarriers[] =
-	{
-		CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
-		CD3DX12_RESOURCE_BARRIER::Transition(inputTex.Resource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON),
-	};
+		{
+			CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+			CD3DX12_RESOURCE_BARRIER::Transition(inputTex.Resource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON),
+		};
 
 	commandList->ResourceBarrier(2, preCopyBarriers);
 	for (UINT arraySlice = 0; arraySlice < 6; arraySlice++)
@@ -161,7 +161,7 @@ Texture RenderingUtils::ComputePrefilteredSpecularEnvironmentMap(Ref<DxContext> 
 	commandList->ResourceBarrier(2, postCopyBarriers);
 
 	// pre-filter rest of the mip chain
-	ID3D12DescriptorHeap* descriptorHeaps[] = { heap.Heap.Get() };
+	ID3D12DescriptorHeap *descriptorHeaps[] = {heap.Heap.Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	commandList->SetPipelineState(m_PipelineStates["spmap"].Get());
@@ -182,7 +182,7 @@ Texture RenderingUtils::ComputePrefilteredSpecularEnvironmentMap(Ref<DxContext> 
 		commandList->Dispatch(numGroups, numGroups, 6);
 	}
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
+																		  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
 
 	dxContext->ExecuteCommandList();
 	dxContext->Flush();
@@ -196,7 +196,7 @@ Texture RenderingUtils::ComputeBRDFLookUpTable(Ref<DxContext> dxContext)
 
 	auto device = dxContext->GetDevice();
 	auto commandList = dxContext->GetCommandList();
-	auto& heap = dxContext->GetCbvSrvUavHeap();
+	auto &heap = dxContext->GetCbvSrvUavHeap();
 
 	Texture outputTex = Texture::Create(device, 256, 256, 1, DXGI_FORMAT_R16G16_FLOAT, 1);
 	outputTex.Srv = heap.Alloc();
@@ -207,9 +207,9 @@ Texture RenderingUtils::ComputeBRDFLookUpTable(Ref<DxContext> dxContext)
 	outputTex.CreateUav(device, 0);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { heap.Heap.Get() };
+	ID3D12DescriptorHeap *descriptorHeaps[] = {heap.Heap.Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	commandList->SetPipelineState(m_PipelineStates["spbrdf"].Get());
@@ -218,7 +218,7 @@ Texture RenderingUtils::ComputeBRDFLookUpTable(Ref<DxContext> dxContext)
 
 	commandList->Dispatch(outputTex.Width / 32, outputTex.Height / 32, 1);
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
+																		  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
 
 	dxContext->ExecuteCommandList();
 	dxContext->Flush();
@@ -226,13 +226,13 @@ Texture RenderingUtils::ComputeBRDFLookUpTable(Ref<DxContext> dxContext)
 	return outputTex;
 }
 
-Texture RenderingUtils::Equirect2Cubemap(Ref<DxContext> dxContext, Texture& inputTex)
+Texture RenderingUtils::Equirect2Cubemap(Ref<DxContext> dxContext, Texture &inputTex)
 {
 	LOG_INFO("Converting equirect texture to cubemp...");
 
 	auto commandList = dxContext->GetCommandList();
 	auto device = dxContext->GetDevice();
-	auto& cbvSrvUavHeap = dxContext->GetCbvSrvUavHeap();
+	auto &cbvSrvUavHeap = dxContext->GetCbvSrvUavHeap();
 
 	Texture outputTex = Texture::Create(device, 1024, 1024, 6, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	outputTex.Srv = cbvSrvUavHeap.Alloc();
@@ -247,7 +247,7 @@ Texture RenderingUtils::Equirect2Cubemap(Ref<DxContext> dxContext, Texture& inpu
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(outputTex.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { cbvSrvUavHeap.Heap.Get() };
+	ID3D12DescriptorHeap *descriptorHeaps[] = {cbvSrvUavHeap.Heap.Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	commandList->SetComputeRootSignature(m_RootSignatures["compute"].Get());
@@ -259,8 +259,8 @@ Texture RenderingUtils::Equirect2Cubemap(Ref<DxContext> dxContext, Texture& inpu
 	commandList->Dispatch(outputTex.Width / 32, outputTex.Height / 32, 6);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-		outputTex.Resource.Get(),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
+										outputTex.Resource.Get(),
+										D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON));
 
 	dxContext->ExecuteCommandList();
 	dxContext->Flush();
@@ -268,7 +268,7 @@ Texture RenderingUtils::Equirect2Cubemap(Ref<DxContext> dxContext, Texture& inpu
 	return outputTex;
 }
 
-void RenderingUtils::GenerateMipmaps(Ref<DxContext> dxContext, Texture& texture)
+void RenderingUtils::GenerateMipmaps(Ref<DxContext> dxContext, Texture &texture)
 {
 	ASSERT(texture.Width == texture.Height, "Currently only support textures with equal width and height.");
 
@@ -276,7 +276,7 @@ void RenderingUtils::GenerateMipmaps(Ref<DxContext> dxContext, Texture& texture)
 	ASSERT(texture.Width != 0 && isPowerOfTwo, "Texture with size not power of two.");
 
 	auto commandList = dxContext->GetCommandList();
-	auto& cbvSrvUavHeap = dxContext->GetCbvSrvUavHeap();
+	auto &cbvSrvUavHeap = dxContext->GetCbvSrvUavHeap();
 	auto device = dxContext->GetDevice();
 
 	DxDescriptorHeapMark mark(cbvSrvUavHeap);
@@ -286,9 +286,9 @@ void RenderingUtils::GenerateMipmaps(Ref<DxContext> dxContext, Texture& texture)
 	auto desc = texture.Resource->GetDesc();
 	auto depth = desc.DepthOrArraySize;
 
-	ID3D12PipelineState* pipelineState = nullptr;
+	ID3D12PipelineState *pipelineState = nullptr;
 
-	ID3D12DescriptorHeap* heaps[] = { cbvSrvUavHeap.Heap.Get() };
+	ID3D12DescriptorHeap *heaps[] = {cbvSrvUavHeap.Heap.Get()};
 	commandList->SetDescriptorHeaps(1, heaps);
 	commandList->SetComputeRootSignature(m_RootSignatures["mipmap"].Get());
 	commandList->SetPipelineState(m_PipelineStates["mipmap"].Get());
@@ -304,16 +304,16 @@ void RenderingUtils::GenerateMipmaps(Ref<DxContext> dxContext, Texture& texture)
 		tempTex.Srv = cbvSrvUavHeap.Alloc();
 		tempTex.Uav = cbvSrvUavHeap.Alloc();
 		tempTex.CreateSrv(device,
-			depth > 1 ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2D, level - 1, 1);
+						  depth > 1 ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2D, level - 1, 1);
 		tempTex.CreateUav(device, level);
 
 		for (UINT arraySlice = 0; arraySlice < depth; arraySlice++)
 		{
 			auto subresourceIndex = D3D12CalcSubresource(1, arraySlice, 0, texture.Levels, depth);
 			preDispatchBarriers[arraySlice] = CD3DX12_RESOURCE_BARRIER::Transition(texture.Resource.Get(),
-				D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, subresourceIndex);
+																				   D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, subresourceIndex);
 			postDispatchBarriers[arraySlice] = CD3DX12_RESOURCE_BARRIER::Transition(texture.Resource.Get(),
-				D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, subresourceIndex);
+																					D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, subresourceIndex);
 		}
 
 		commandList->ResourceBarrier(depth, preDispatchBarriers.data());

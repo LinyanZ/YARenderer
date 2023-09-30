@@ -60,7 +60,7 @@ float4 PS(VertexOut pin) : SV_TARGET
 {
     int2 texCoord = pin.PositionH.xy;
     
-    float3 albedo = AlbedoTexture.Load(int3(texCoord, 0));
+    float3 albedo = AlbedoTexture.Load(int3(texCoord, 0)).xyz;
     float3 normal = NormalTexture.Load(int3(texCoord, 0)).xyz;
     float metalness = MetalnessTexture.Load(int3(texCoord, 0)).r;
     float roughness = RoughnessTexture.Load(int3(texCoord, 0)).r;

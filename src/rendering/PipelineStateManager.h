@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pch.h"
+#include "dx/dx.h"
 #include "dx/DxContext.h"
 
 class PipelineStateManager
@@ -21,9 +22,9 @@ private:
 	std::unordered_map<std::string, PipelineState> m_PSOs;
 	std::unordered_map<std::string, RootSignature> m_RootSignatures;
 
-	std::unordered_map<std::string, Blob> m_VSByteCodes;
-	std::unordered_map<std::string, Blob> m_PSByteCodes;
-	std::unordered_map<std::string, Blob> m_CSByteCodes;
+	std::unordered_map<std::string, Shader> m_VSByteCodes;
+	std::unordered_map<std::string, Shader> m_PSByteCodes;
+	std::unordered_map<std::string, Shader> m_CSByteCodes;
 
 	std::unordered_map<std::string, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_InputLayouts;
 

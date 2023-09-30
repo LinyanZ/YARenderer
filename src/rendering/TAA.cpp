@@ -18,9 +18,9 @@ TAA::TAA(Ref<DxContext> dxContext, UINT width, UINT height)
 	BuildPSO();
 }
 
-void TAA::Render(GraphicsCommandList commandList, Texture& velocityBuffer, bool isFirstFrame)
+void TAA::Render(GraphicsCommandList commandList, Texture &velocityBuffer, bool isFirstFrame)
 {
-	auto& backBuffer = m_DxContext->CurrentBackBuffer();
+	auto &backBuffer = m_DxContext->CurrentBackBuffer();
 
 	// No need to perform anything for the first frame
 	if (!isFirstFrame)
@@ -28,12 +28,10 @@ void TAA::Render(GraphicsCommandList commandList, Texture& velocityBuffer, bool 
 		// Copy the current back buffer to a temp resource for read
 		const D3D12_RESOURCE_BARRIER preCopyBarriers[] = {
 			CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE),
-			CD3DX12_RESOURCE_BARRIER::Transition(m_SourceBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST)
-		};
+			CD3DX12_RESOURCE_BARRIER::Transition(m_SourceBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST)};
 		const D3D12_RESOURCE_BARRIER postCopyBarriers[] = {
 			CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET),
-			CD3DX12_RESOURCE_BARRIER::Transition(m_SourceBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON)
-		};
+			CD3DX12_RESOURCE_BARRIER::Transition(m_SourceBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON)};
 
 		commandList->ResourceBarrier(2, preCopyBarriers);
 		commandList->CopyResource(m_SourceBuffer.Resource.Get(), backBuffer.Resource.Get());
@@ -54,12 +52,10 @@ void TAA::Render(GraphicsCommandList commandList, Texture& velocityBuffer, bool 
 	{
 		const D3D12_RESOURCE_BARRIER preCopyBarriers[] = {
 			CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE),
-			CD3DX12_RESOURCE_BARRIER::Transition(m_HistoryBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST)
-		};
+			CD3DX12_RESOURCE_BARRIER::Transition(m_HistoryBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST)};
 		const D3D12_RESOURCE_BARRIER postCopyBarriers[] = {
 			CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET),
-			CD3DX12_RESOURCE_BARRIER::Transition(m_HistoryBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON)
-		};
+			CD3DX12_RESOURCE_BARRIER::Transition(m_HistoryBuffer.Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON)};
 
 		commandList->ResourceBarrier(2, preCopyBarriers);
 		commandList->CopyResource(m_HistoryBuffer.Resource.Get(), backBuffer.Resource.Get());
@@ -79,12 +75,12 @@ void TAA::OnResize(UINT width, UINT height)
 void TAA::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE descriptorRanges[4] =
-	{
-		{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0},		// source
-		{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0},		// history
-		{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0},		// depth
-		{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3, 0},		// velocity
-	};
+		{
+			{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0}, // source
+			{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0}, // history
+			{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0}, // depth
+			{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3, 0}, // velocity
+		};
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 	slotRootParameter[0].InitAsDescriptorTable(1, &descriptorRanges[0], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -92,19 +88,19 @@ void TAA::BuildRootSignature()
 	slotRootParameter[2].InitAsDescriptorTable(1, &descriptorRanges[2], D3D12_SHADER_VISIBILITY_PIXEL);
 	slotRootParameter[3].InitAsDescriptorTable(1, &descriptorRanges[3], D3D12_SHADER_VISIBILITY_PIXEL);
 
-	CD3DX12_STATIC_SAMPLER_DESC linearSamplerDesc{ 0, D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT };
+	CD3DX12_STATIC_SAMPLER_DESC linearSamplerDesc{0, D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT};
 	linearSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 	CD3DX12_ROOT_SIGNATURE_DESC desc(4, slotRootParameter, 1, &linearSamplerDesc,
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+									 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	m_RootSignature = Utils::CreateRootSignature(m_Device, desc);
 }
 
 void TAA::BuildPSO()
 {
-	auto VSByteCode = Utils::CompileShader(L"shaders\\taa.hlsl", nullptr, "VS", "vs_5_0");
-	auto PSByteCode = Utils::CompileShader(L"shaders\\taa.hlsl", nullptr, "PS", "ps_5_0");
+	auto VSByteCode = Utils::CompileShader(L"shaders\\taa.hlsl", nullptr, L"VS", L"vs_6_6");
+	auto PSByteCode = Utils::CompileShader(L"shaders\\taa.hlsl", nullptr, L"PS", L"ps_6_6");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc;
 	ZeroMemory(&desc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
@@ -116,12 +112,12 @@ void TAA::BuildPSO()
 	desc.SampleMask = UINT_MAX;
 	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	desc.NumRenderTargets = 1;
-	desc.SampleDesc = { 1, 0 };
+	desc.SampleDesc = {1, 0};
 	desc.RTVFormats[0] = BACK_BUFFER_FORMAT;
 	desc.DSVFormat = DEPTH_STENCIL_FORMAT;
 	desc.pRootSignature = m_RootSignature.Get();
-	desc.VS = CD3DX12_SHADER_BYTECODE(VSByteCode.Get());
-	desc.PS = CD3DX12_SHADER_BYTECODE(PSByteCode.Get());
+	desc.VS = CD3DX12_SHADER_BYTECODE(VSByteCode->GetBufferPointer(), VSByteCode->GetBufferSize());
+	desc.PS = CD3DX12_SHADER_BYTECODE(PSByteCode->GetBufferPointer(), PSByteCode->GetBufferSize());
 
 	ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSO)));
 }
