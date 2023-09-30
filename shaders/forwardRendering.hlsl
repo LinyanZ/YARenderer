@@ -1,6 +1,6 @@
 #include "common.hlsl"
 #include "lightingUtils.hlsl"
-#include "cascadeShadow.hlsl"
+#include "cascadedShadow.hlsl"
 #include "voxelUtils.hlsl"
 
 cbuffer cbPerObject : register(b0)

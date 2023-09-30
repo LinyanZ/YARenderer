@@ -17,9 +17,10 @@
 #include "Material.h"
 #include "Light.h"
 #include "Mesh.h"
-#include "CascadeShadowMap.h"
+#include "CascadedShadowMap.h"
 #include "EnvironmentMap.h"
 #include "RenderingUtils.h"
+#include "PipelineStates.h"
 #include "TAA.h"
 
 #include "vxgi/VolumeTexture.h"
@@ -53,14 +54,28 @@ struct RenderItem
 	Ref<Mesh> Mesh;
 };
 
+struct SkyBoxRenderResources
+{
+	UINT EnvMapTexIndex;
+};
+
+struct ShadowRenderResources
+{
+	UINT CascadeIndex;
+};
+
 struct Renderer
 {
 public:
 	Renderer(Ref<DxContext> dxContext, UINT width, UINT height);
-	~Renderer() { RenderingUtils::Cleanup(); }
+	~Renderer()
+	{
+		RenderingUtils::Cleanup();
+		PipelineStates::Cleanup();
+	}
 
 	void Setup();
-	void OnUpdate(Timer& timer);
+	void OnUpdate(Timer &timer);
 
 	void BeginFrame();
 	void Render();
@@ -72,18 +87,18 @@ public:
 	void OnKeyboardInput(float dt);
 	void OnMouseInput(int dxPixel, int dyPixel);
 
-	Light& GetDirectionalLight() { return m_Lights[0]; }
+	Light &GetDirectionalLight() { return m_Lights[0]; }
 
 private:
 	void BuildResources();
 	void AllocateDescriptors();
 	void BuildDescriptors();
 
-	FrameResource* CurrFrameResource() { return m_FrameResources[m_CurrFrameResourceIndex].get(); }
+	FrameResource *CurrFrameResource() { return m_FrameResources[m_CurrFrameResourceIndex].get(); }
 
-	void UpdateLights(Timer& timer);
+	void UpdateLights(Timer &timer);
 	void UpdateObjectConstantBuffers();
-	void UpdateMainPassConstantBuffer(Timer& timer);
+	void UpdateMainPassConstantBuffer(Timer &timer);
 	void UpdateMaterialConstantBuffer();
 	void UpdateSSAOConstantBuffer();
 	void UpdateShadowPassCB();
@@ -102,7 +117,7 @@ private:
 	void ShadowMapPass(GraphicsCommandList commandList);
 	void DrawRenderItems(GraphicsCommandList commandList, RenderPass pass = RenderPass::ForwardRendering, bool transparent = false);
 	void DrawSkybox(GraphicsCommandList commandList);
-	void VelocityBufferPass(GraphicsCommandList commandList);
+	void DepthPrepass(GraphicsCommandList commandList);
 
 	void ClearVoxel(GraphicsCommandList commandList);
 	void VoxelizeScene(GraphicsCommandList commandList);
@@ -130,7 +145,7 @@ private:
 	ShadowPassConstants m_ShadowPassCB;
 
 	Camera m_Camera;
-	std::unique_ptr<CascadeShadowMap> m_CascadeShadowMap;
+	std::unique_ptr<CascadedShadowMap> m_CascadedShadowMap;
 
 	Ref<Mesh> m_PointLightGeo;
 	Ref<Mesh> m_Skybox;

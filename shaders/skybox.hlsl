@@ -1,29 +1,8 @@
 #include "renderResources.hlsl"
 #include "samplers.hlsl"
+#include "constantBuffers.hlsl"
 
-cbuffer cbPass : register(b1)
-{
-    float4x4 gView;
-    float4x4 gInvView;
-    float4x4 gProj;
-    float4x4 gInvProj;
-    float4x4 gViewProj;
-    float4x4 gPrevViewProj;
-    float4x4 gInvViewProj;
-    float4x4 gViewProjTex;
-    float3 gEyePosW;
-    float cbPerObjectPad1;
-    float2 gRenderTargetSize;
-    float2 gInvRenderTargetSize;
-    float gNearZ;
-    float gFarZ;
-    float gTotalTime;
-    float gDeltaTime;
-    float2 gJitter;
-    float2 gPreviousJitter;
-};
-
-ConstantBuffer<SkyBoxRenderResources> g_Resources : register(b2);
+ConstantBuffer<SkyBoxRenderResources> g_Resources : register(b6);
 
 struct VertexIn
 {
@@ -47,10 +26,10 @@ VertexOut VS(VertexIn vin)
     float4 posW = float4(vin.PosL, 1.0f);
 
 	// Always center sky about camera.
-    posW.xyz += gEyePosW;
+    posW.xyz += g_EyePosW;
 
 	// Set z = w so that z/w = 1 (i.e., skydome always on far plane).
-    vout.PosH = mul(posW, gViewProj).xyww;
+    vout.PosH = mul(posW, g_ViewProj).xyww;
 
     return vout;
 }

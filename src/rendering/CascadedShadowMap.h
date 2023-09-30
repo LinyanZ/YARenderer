@@ -9,28 +9,28 @@
 #define NUM_FRUSTUM_CORNERS 8
 #define SHADOW_MAP_SIZE 4096
 
-class CascadeShadowMap
+class CascadedShadowMap
 {
 public:
-	CascadeShadowMap(Ref<DxContext> dxContext);
+	CascadedShadowMap(Ref<DxContext> dxContext);
 
-	void CalcOrthoProjs(const Camera& camera, const Light& mainLight);
+	void CalcOrthoProjs(const Camera &camera, const Light &mainLight);
 
 	XMMATRIX ViewProjMatrix(int index) const { return m_ViewProjMatrix[index]; }
 	float CascadeRadius(int index) const { return m_CascadeRadius[index]; }
 	float CascadeEnds(int index) const { return m_CascadeEnds[index]; }
 
-	ID3D12Resource* GetResource() { return m_Resource.Get(); }
-	Descriptor& Dsv(int index) { return m_Dsvs[index]; }
-	Descriptor& Srv(int index) { return m_Srvs[index]; }
-	D3D12_VIEWPORT& Viewport() { return m_Viewport; }
-	D3D12_RECT& ScissorRect() { return m_ScissorRect; }
+	ID3D12Resource *GetResource() { return m_Resource.Get(); }
+	Descriptor &Dsv(int index) { return m_Dsvs[index]; }
+	Descriptor &Srv(int index) { return m_Srvs[index]; }
+	D3D12_VIEWPORT &Viewport() { return m_Viewport; }
+	D3D12_RECT &ScissorRect() { return m_ScissorRect; }
 
 private:
 	Device m_Device;
 
-	D3D12_VIEWPORT m_Viewport{ 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, 0.0f, 1.0f };
-	D3D12_RECT m_ScissorRect{ 0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE };
+	D3D12_VIEWPORT m_Viewport{0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, 0.0f, 1.0f};
+	D3D12_RECT m_ScissorRect{0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE};
 
 	DXGI_FORMAT m_Format = DXGI_FORMAT_R24G8_TYPELESS;
 

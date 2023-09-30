@@ -1,5 +1,5 @@
 #include "common.hlsl"
-#include "cascadeShadow.hlsl"
+#include "cascadedShadow.hlsl"
 
 cbuffer cbPerObject : register(b0)
 {

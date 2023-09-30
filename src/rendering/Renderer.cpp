@@ -19,7 +19,7 @@ Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 
 	m_PipelineStateManager = std::make_unique<PipelineStateManager>(dxContext->GetDevice());
 	m_EnvironmentMap = std::make_unique<EnvironmentMap>(dxContext);
-	m_CascadeShadowMap = std::make_unique<CascadeShadowMap>(dxContext);
+	m_CascadedShadowMap = std::make_unique<CascadedShadowMap>(dxContext);
 	m_PostProcessing = std::make_unique<PostProcessing>(dxContext, width, height);
 	m_SSAO = std::make_unique<SSAO>(dxContext, width, height);
 	m_TAA = std::make_unique<TAA>(dxContext, width, height);
@@ -33,6 +33,7 @@ Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 	m_Camera.SetLens(0.25f * MathHelper::Pi, (float)width / height, 1.0f, 1000.0f);
 
 	RenderingUtils::Init(dxContext);
+	PipelineStates::Init(dxContext->GetDevice());
 
 	m_VolumeAlbedo.Init(dxContext, VOXEL_DIMENSION);
 }
@@ -109,7 +110,7 @@ void Renderer::OnUpdate(Timer &timer)
 	UpdateMaterialConstantBuffer();
 	UpdateSSAOConstantBuffer();
 
-	m_CascadeShadowMap->CalcOrthoProjs(m_Camera, m_Lights[0]);
+	m_CascadedShadowMap->CalcOrthoProjs(m_Camera, m_Lights[0]);
 	UpdateShadowPassCB();
 }
 
@@ -126,19 +127,31 @@ void Renderer::Render()
 {
 	auto commandList = m_DxContext->GetCommandList();
 
+	// set the descriptor heap and a universal root signature thanks to Bindless Rendering
 	ID3D12DescriptorHeap *descriptorHeaps[] = {m_DxContext->GetCbvSrvUavHeap().Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("universal").Get());
+	commandList->SetGraphicsRootSignature(PipelineStates::GetRootSignature());
+
+	// set pass constant buffer
+	auto passCB = CurrFrameResource()->PassCB->GetResource();
+	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::PassCB, passCB->GetGPUVirtualAddress());
+
+	// set shadow constant buffer
+	auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
+	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::ShadowCB, shadowCB->GetGPUVirtualAddress());
+
+	DepthPrepass(commandList);	// depth prepass and velocity buffer
+	ShadowMapPass(commandList); // cascaded shadow from directional light
 
 	commandList->RSSetViewports(1, &m_ScreenViewport);
 	commandList->RSSetScissorRects(1, &m_ScissorRect);
 
-	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, Colors::Black, 0, nullptr);
 	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 
 	DrawSkybox(commandList);
+
 	// VelocityBufferPass(commandList);
-	// ShadowMapPass(commandList);
 
 	// if (g_RenderingSettings.DynamicUpdate)
 	// {
@@ -166,11 +179,11 @@ void Renderer::Render()
 	// 	m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
 	// }
 
-	// Debug(commandList, m_SSAO->AmbientMap().Srv, 0);
-	// Debug(commandList, m_CascadeShadowMap->Srv(0), 12);
-	// Debug(commandList, m_CascadeShadowMap->Srv(1), 13);
-	// Debug(commandList, m_CascadeShadowMap->Srv(2), 14);
-	// Debug(commandList, m_CascadeShadowMap->Srv(3), 15);
+	Debug(commandList, m_VelocityBuffer.Srv, 0);
+	Debug(commandList, m_CascadedShadowMap->Srv(0), 12);
+	Debug(commandList, m_CascadedShadowMap->Srv(1), 13);
+	Debug(commandList, m_CascadedShadowMap->Srv(2), 14);
+	Debug(commandList, m_CascadedShadowMap->Srv(3), 15);
 }
 
 void Renderer::EndFrame()
@@ -313,7 +326,7 @@ void Renderer::ForwardRendering(GraphicsCommandList commandList)
 	commandList->SetGraphicsRootDescriptorTable(8, m_SSAO->AmbientMap().Srv.GPUHandle);
 
 	// Bind Shadow map
-	commandList->SetGraphicsRootDescriptorTable(9, m_CascadeShadowMap->Srv(4).GPUHandle);
+	commandList->SetGraphicsRootDescriptorTable(9, m_CascadedShadowMap->Srv(4).GPUHandle);
 
 	// Bind lighting data
 	auto lightingDataBuffer = CurrFrameResource()->LightBuffer->GetResource();
@@ -524,7 +537,7 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 	{
 		// Set object constant buffer
 		auto objCBAddress = objectCB->GetGPUVirtualAddress() + ritem->objCBIndex * objCBByteSize;
-		commandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+		commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::ObjectCB, objCBAddress);
 
 		auto &mesh = ritem->Mesh;
 		commandList->IASetVertexBuffers(0, 1, &mesh->VertexBufferView());
@@ -540,7 +553,7 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 			switch (pass)
 			{
 			case RenderPass::NormalOnly:
-				commandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
+				commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::MatCB, matCBAddress);
 				if (material.HasNormalTexture)
 					commandList->SetGraphicsRootDescriptorTable(3, material.NormalTexture.Srv.GPUHandle);
 				break;
@@ -574,52 +587,39 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 
 void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 {
-	commandList->RSSetViewports(1, &m_CascadeShadowMap->Viewport());
-	commandList->RSSetScissorRects(1, &m_CascadeShadowMap->ScissorRect());
+	commandList->RSSetViewports(1, &m_CascadedShadowMap->Viewport());
+	commandList->RSSetScissorRects(1, &m_CascadedShadowMap->ScissorRect());
 
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("shadow").Get());
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("shadow").Get());
+	commandList->SetPipelineState(PipelineStates::GetPSO("shadow"));
 
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadeShadowMap->GetResource(),
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadedShadowMap->GetResource(),
 																		  D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
-	// Set shadow pass constant
-	auto passCB = CurrFrameResource()->ShadowCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-	for (int i = 0; i < NUM_CASCADES; i++)
+	for (UINT i = 0; i < NUM_CASCADES; i++)
 	{
 		// Bind cascade shadow index
-		commandList->SetGraphicsRoot32BitConstant(2, i, 0);
+		ShadowRenderResources shadowRenderResources{i};
+		commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1,
+												   reinterpret_cast<void *>(&shadowRenderResources), 0);
 
-		commandList->ClearDepthStencilView(m_CascadeShadowMap->Dsv(i).CPUHandle,
+		commandList->ClearDepthStencilView(m_CascadedShadowMap->Dsv(i).CPUHandle,
 										   D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-		commandList->OMSetRenderTargets(0, nullptr, false, &m_CascadeShadowMap->Dsv(i).CPUHandle);
+		commandList->OMSetRenderTargets(0, nullptr, false, &m_CascadedShadowMap->Dsv(i).CPUHandle);
 
 		DrawRenderItems(commandList, RenderPass::Shadow);
 	}
 
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadeShadowMap->GetResource(),
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadedShadowMap->GetResource(),
 																		  D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void Renderer::DrawSkybox(GraphicsCommandList commandList)
 {
-	struct SkyBoxRenderResource
-	{
-		UINT TexIndex;
-	};
+	SkyBoxRenderResources skyBoxRenderResource{m_EnvironmentMap->GetEnvMap().Srv.Index};
 
-	SkyBoxRenderResource skyBoxRenderResource{m_EnvironmentMap->GetEnvMap().Srv.Index};
-
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("skybox").Get());
-
-	// Set pass constant buffer
-	auto passCB = CurrFrameResource()->PassCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-	commandList->SetGraphicsRoot32BitConstants(2, 1, reinterpret_cast<void *>(&skyBoxRenderResource), 0);
+	commandList->SetPipelineState(PipelineStates::GetPSO("skybox"));
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1,
+											   reinterpret_cast<void *>(&skyBoxRenderResource), 0);
 
 	commandList->IASetVertexBuffers(0, 1, &m_Skybox->VertexBufferView());
 	commandList->IASetIndexBuffer(&m_Skybox->IndexBufferView());
@@ -628,7 +628,7 @@ void Renderer::DrawSkybox(GraphicsCommandList commandList)
 	commandList->DrawIndexedInstanced(m_Skybox->SubMeshes()[0].IndexCount, 1, 0, 0, 0);
 }
 
-void Renderer::VelocityBufferPass(GraphicsCommandList commandList)
+void Renderer::DepthPrepass(GraphicsCommandList commandList)
 {
 	commandList->RSSetViewports(1, &m_ScreenViewport);
 	commandList->RSSetScissorRects(1, &m_ScissorRect);
@@ -636,18 +636,11 @@ void Renderer::VelocityBufferPass(GraphicsCommandList commandList)
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VelocityBuffer.Resource.Get(),
 																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	// Clear the background
-	commandList->ClearRenderTargetView(m_VelocityBuffer.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 1.0f}, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
+	commandList->ClearRenderTargetView(m_VelocityBuffer.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 1.0f}, 0, nullptr);
 	commandList->OMSetRenderTargets(1, &m_VelocityBuffer.Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("velocityBuffer").Get());
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("velocityBuffer").Get());
-
-	// Bind pass constant buffer
-	auto passCB = CurrFrameResource()->PassCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+	commandList->SetPipelineState(PipelineStates::GetPSO("depthPrepass"));
 
 	DrawRenderItems(commandList, RenderPass::Velocity);
 
@@ -679,7 +672,7 @@ void Renderer::VoxelizeScene(GraphicsCommandList commandList)
 	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
 	// Bind Shadow map
-	commandList->SetGraphicsRootDescriptorTable(7, m_CascadeShadowMap->Srv(4).GPUHandle);
+	commandList->SetGraphicsRootDescriptorTable(7, m_CascadedShadowMap->Srv(4).GPUHandle);
 
 	// Bind lighting data
 	auto lightingDataBuffer = CurrFrameResource()->LightBuffer->GetResource();
@@ -975,13 +968,13 @@ void Renderer::UpdateShadowPassCB()
 {
 	for (int i = 0; i < NUM_CASCADES; i++)
 	{
-		XMMATRIX viewProj = m_CascadeShadowMap->ViewProjMatrix(i);
+		XMMATRIX viewProj = m_CascadedShadowMap->ViewProjMatrix(i);
 		XMStoreFloat4x4(&m_ShadowPassCB.ViewProjMatrix[i], XMMatrixTranspose(viewProj));
-		m_ShadowPassCB.CascadeRadius[i] = m_CascadeShadowMap->CascadeRadius(i);
-		m_ShadowPassCB.CascadeEnds[i] = m_CascadeShadowMap->CascadeEnds(i);
+		m_ShadowPassCB.CascadeRadius[i] = m_CascadedShadowMap->CascadeRadius(i);
+		m_ShadowPassCB.CascadeEnds[i] = m_CascadedShadowMap->CascadeEnds(i);
 	}
 
-	m_ShadowPassCB.CascadeEnds[NUM_CASCADES] = m_CascadeShadowMap->CascadeEnds(NUM_CASCADES);
+	m_ShadowPassCB.CascadeEnds[NUM_CASCADES] = m_CascadedShadowMap->CascadeEnds(NUM_CASCADES);
 	m_ShadowPassCB.TransitionRatio = g_RenderingSettings.CascadeTransitionRatio;
 	m_ShadowPassCB.Softness = g_RenderingSettings.ShadowSoftness;
 	m_ShadowPassCB.ShowCascades = g_RenderingSettings.ShowCascades;

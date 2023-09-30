@@ -1,10 +1,10 @@
 #include "pch.h"
-#include "CascadeShadowMap.h"
+#include "CascadedShadowMap.h"
 #include "RenderingSettings.h"
 
 extern RenderingSettings g_RenderingSettings;
 
-CascadeShadowMap::CascadeShadowMap(Ref<DxContext> dxContext)
+CascadedShadowMap::CascadedShadowMap(Ref<DxContext> dxContext)
 	: m_Device(dxContext->GetDevice())
 {
 	D3D12_RESOURCE_DESC texDesc = {};
@@ -15,7 +15,7 @@ CascadeShadowMap::CascadeShadowMap(Ref<DxContext> dxContext)
 	texDesc.DepthOrArraySize = 4;
 	texDesc.MipLevels = 1;
 	texDesc.Format = m_Format;
-	texDesc.SampleDesc = { 1, 0 };
+	texDesc.SampleDesc = {1, 0};
 	texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
@@ -65,12 +65,12 @@ CascadeShadowMap::CascadeShadowMap(Ref<DxContext> dxContext)
 	m_Device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, m_Srvs[4].CPUHandle);
 }
 
-void CascadeShadowMap::CalcOrthoProjs(const Camera& camera, const Light& mainLight)
+void CascadedShadowMap::CalcOrthoProjs(const Camera &camera, const Light &mainLight)
 {
 	// Calculate each cascade's range
 	m_CascadeEnds[0] = camera.GetNearZ();
 
-	float expScale[NUM_CASCADES] = { 1.0f };
+	float expScale[NUM_CASCADES] = {1.0f};
 	float expNormalizeFactor = 1.0f;
 	for (int i = 1; i < NUM_CASCADES; i++)
 	{
@@ -138,7 +138,7 @@ void CascadeShadowMap::CalcOrthoProjs(const Camera& camera, const Light& mainLig
 
 		auto sphereCenterWS = camera.GetPosition() + camera.GetLook() * (nearZ + x);
 		float sphereRadius = sqrtf(x * x + a2 * 0.25);
-		//LOG_INFO("Cascade radius [{}]: {}", i, sphereRadius);
+		// LOG_INFO("Cascade radius [{}]: {}", i, sphereRadius);
 
 		// for removing edge shimmer effect
 		XMMATRIX shadowView = XMMatrixLookAtLH(XMVectorSet(0, 0, 0, 1), -lightDir, lightUp);

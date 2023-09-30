@@ -37,44 +37,4 @@ struct VertexOut
     float4 PositionH    : SV_POSITION;      // Clip space position.
 };
 
-struct Material
-{
-    float4 AmbientColor;
-    //-------------------------- ( 16 bytes )
-    float4 Albedo;
-    //-------------------------- ( 16 bytes )
-    float Metalness;
-    float Roughness;
-    float2 Padding;
-    //-------------------------- ( 16 bytes )
-    bool HasAlbedoTexture;
-    bool HasNormalTexture;
-    bool HasMetalnessTexture;
-    bool HasRoughnessTexture;
-    //-------------------------- ( 16 bytes )
-};  //-------------------------- ( 16 * 5 = 80 bytes )
-
-struct Light
-{
-    float4 PositionWS;
-    //-------------------------- ( 16 bytes )
-    float4 DirectionWS;
-    //-------------------------- ( 16 bytes )
-    float4 PositionVS;
-    //-------------------------- ( 16 bytes )
-    float4 DirectionVS;
-    //-------------------------- ( 16 bytes )
-    float4 Color;
-    //-------------------------- ( 16 bytes )
-    float SpotlightAngle;
-    float Range;
-    float Intensity;
-    bool Enabled;
-    //-------------------------- ( 16 bytes )
-    bool Selected;
-    uint Type;
-    float2 Padding;
-    //-------------------------- ( 16 bytes )
-};  //-------------------------- ( 16 * 7 = 112 bytes )
-
 #endif // __COMMON_HLSL__

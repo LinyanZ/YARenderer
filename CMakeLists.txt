@@ -55,8 +55,8 @@ set(SRC_FILES
     src/rendering/Camera.h
     src/rendering/Camera.cpp
 
-    src/rendering/CascadeShadowmap.h
-    src/rendering/CascadeShadowmap.cpp
+    src/rendering/CascadedShadowmap.h
+    src/rendering/CascadedShadowmap.cpp
 
     src/rendering/EnvironmentMap.h
     src/rendering/EnvironmentMap.cpp
@@ -100,6 +100,9 @@ set(SRC_FILES
 
     src/rendering/postProcessing/ToneMapping.h
     src/rendering/postProcessing/ToneMapping.cpp
+
+    src/rendering/PipelineStates.h
+    src/rendering/PipelineStates.cpp
 
     src/asset/Image.h
     src/asset/Image.cpp

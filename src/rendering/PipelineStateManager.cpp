@@ -419,6 +419,21 @@ void PipelineStateManager::BuildPSOs()
 		desc.SampleDesc = {1, 0};
 		desc.DSVFormat = DEPTH_STENCIL_FORMAT;
 
+		// debug
+		{
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPSO = desc;
+			debugPSO.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+			debugPSO.DepthStencilState.DepthEnable = false;
+			debugPSO.pRootSignature = m_RootSignatures["debug"].Get();
+			debugPSO.RTVFormats[0] = BACK_BUFFER_FORMAT;
+			debugPSO.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["debug"]->GetBufferPointer(), m_VSByteCodes["debug"]->GetBufferSize());
+			debugPSO.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["debug"]->GetBufferPointer(), m_PSByteCodes["debug"]->GetBufferSize());
+
+			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&debugPSO, IID_PPV_ARGS(&m_PSOs["debug"])));
+		}
+
+		return;
+
 		// forward rendering
 		{
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC forwardRenderingDesc = desc;
@@ -443,24 +458,6 @@ void PipelineStateManager::BuildPSOs()
 
 			forwardRenderingDesc.BlendState.RenderTarget[0] = blendDesc;
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&forwardRenderingDesc, IID_PPV_ARGS(&m_PSOs["forwardRenderingTransparent"])));
-		}
-
-		// shadow pass
-		{
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPassDesc = desc;
-			shadowPassDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
-			shadowPassDesc.pRootSignature = m_RootSignatures["shadow"].Get();
-			shadowPassDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["shadow"]->GetBufferPointer(), m_VSByteCodes["shadow"]->GetBufferSize());
-			shadowPassDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["shadow"]->GetBufferPointer(), m_PSByteCodes["shadow"]->GetBufferSize());
-
-			shadowPassDesc.RasterizerState.DepthBias = 100000;
-			shadowPassDesc.RasterizerState.DepthBiasClamp = 10.0f;
-			shadowPassDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-
-			shadowPassDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
-			shadowPassDesc.NumRenderTargets = 0;
-
-			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&shadowPassDesc, IID_PPV_ARGS(&m_PSOs["shadow"])));
 		}
 
 		// defered rendering g-buffer pass
@@ -566,36 +563,6 @@ void PipelineStateManager::BuildPSOs()
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&deferredLightingPass1, IID_PPV_ARGS(&m_PSOs["deferredRenderingLightingPass1"])));
 		}
 
-		// skybox PSO
-		{
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC skyboxDesc = desc;
-			skyboxDesc.InputLayout = {m_InputLayouts["skybox"].data(), (UINT)m_InputLayouts["skybox"].size()};
-			skyboxDesc.pRootSignature = m_RootSignatures["universal"].Get();
-			skyboxDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["skybox"]->GetBufferPointer(), m_VSByteCodes["skybox"]->GetBufferSize());
-			skyboxDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["skybox"]->GetBufferPointer(), m_PSByteCodes["skybox"]->GetBufferSize());
-
-			// camera is inside the skybox, so just turn off the culling
-			skyboxDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-
-			// skybox is drawn with depth value of z = 1 (NDC), which will fail the depth test
-			// if the depth buffer was cleared to 1 and the depth function is LESS
-			skyboxDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-
-			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&skyboxDesc, IID_PPV_ARGS(&m_PSOs["skybox"])));
-		}
-
-		// velocity buffer
-		{
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC velocityDesc = desc;
-			velocityDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
-			velocityDesc.pRootSignature = m_RootSignatures["velocityBuffer"].Get();
-			velocityDesc.RTVFormats[0] = VELOCITY_BUFFER_FORMAT;
-			velocityDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["velocityBuffer"]->GetBufferPointer(), m_VSByteCodes["velocityBuffer"]->GetBufferSize());
-			velocityDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["velocityBuffer"]->GetBufferPointer(), m_PSByteCodes["velocityBuffer"]->GetBufferSize());
-
-			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&velocityDesc, IID_PPV_ARGS(&m_PSOs["velocityBuffer"])));
-		}
-
 		// draw normal
 		{
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC drawNormalDesc = desc;
@@ -606,19 +573,6 @@ void PipelineStateManager::BuildPSOs()
 			drawNormalDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["drawNormal"]->GetBufferPointer(), m_PSByteCodes["drawNormal"]->GetBufferSize());
 
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&drawNormalDesc, IID_PPV_ARGS(&m_PSOs["drawNormal"])));
-		}
-
-		// debug
-		{
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPSO = desc;
-			debugPSO.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-			debugPSO.DepthStencilState.DepthEnable = false;
-			debugPSO.pRootSignature = m_RootSignatures["debug"].Get();
-			debugPSO.RTVFormats[0] = BACK_BUFFER_FORMAT;
-			debugPSO.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["debug"]->GetBufferPointer(), m_VSByteCodes["debug"]->GetBufferSize());
-			debugPSO.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["debug"]->GetBufferPointer(), m_PSByteCodes["debug"]->GetBufferSize());
-
-			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&debugPSO, IID_PPV_ARGS(&m_PSOs["debug"])));
 		}
 	}
 
