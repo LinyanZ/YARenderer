@@ -25,7 +25,7 @@
 
 #include "vxgi/VolumeTexture.h"
 
-#define SPONZA_SCENE 0
+#define SPONZA_SCENE 1
 #define TEST_SCENE (!SPONZA_SCENE)
 
 #define FORWARD_RENDERING 1

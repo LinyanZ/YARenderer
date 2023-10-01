@@ -14,17 +14,18 @@ public:
 	void OnResize(UINT width, UINT height);
 	void Present(bool vsync);
 
-	Texture& CurrentBackBuffer() { return m_SwapChainBuffer[m_CurrBackBuffer]; }
-	Texture& DepthStencilBuffer() { return m_DepthStencilBuffer; }
+	Texture &CurrentBackBuffer() { return m_SwapChainBuffer[m_CurrBackBuffer]; }
+	Texture &DepthStencilBuffer() { return m_DepthStencilBuffer; }
 	Device GetDevice() { return m_Device; }
 
-	DescriptorHeap& GetRtvHeap() { return m_RtvHeap; }
-	DescriptorHeap& GetDsvHeap() { return m_DsvHeap; }
-	DescriptorHeap& GetCbvSrvUavHeap() { return m_CbvSrvUavHeap; }
-	DescriptorHeap& GetImGuiHeap() { return m_ImGuiHeap; }
+	DescriptorHeap &GetRtvHeap() { return m_RtvHeap; }
+	DescriptorHeap &GetDsvHeap() { return m_DsvHeap; }
+	DescriptorHeap &GetCbvSrvUavHeap() { return m_CbvSrvUavHeap; }
+	DescriptorHeap &GetImGuiHeap() { return m_ImGuiHeap; }
 
 	GraphicsCommandList GetCommandList();
 	UINT64 ExecuteCommandList();
+	UINT64 Signal() { return m_CommandQueue->Signal(); }
 	void WaitForFenceValue(UINT64 fenceValue) { m_CommandQueue->WaitForFenceValue(fenceValue); }
 	void Flush() { m_CommandQueue->Flush(); }
 

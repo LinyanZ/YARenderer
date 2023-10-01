@@ -114,6 +114,7 @@ void Renderer::OnUpdate(Timer &timer)
 
 void Renderer::BeginFrame()
 {
+	m_CurrFrameResourceIndex = (m_CurrFrameResourceIndex + 1) % NUM_FRAMES_IN_FLIGHT;
 	m_DxContext->WaitForFenceValue(CurrFrameResource()->Fence);
 
 	auto commandList = m_DxContext->GetCommandList();
@@ -153,8 +154,6 @@ void Renderer::Render()
 	DeferredLightingPass(commandList);
 
 	DrawSkybox(commandList);
-
-	// VelocityBufferPass(commandList);
 
 	// if (g_RenderingSettings.DynamicUpdate)
 	// {
@@ -200,12 +199,9 @@ void Renderer::EndFrame()
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_DxContext->CurrentBackBuffer().Resource.Get(),
 																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	UINT64 nextFence = m_DxContext->ExecuteCommandList();
-	CurrFrameResource()->Fence = nextFence;
-
+	CurrFrameResource()->Fence = m_DxContext->ExecuteCommandList();
 	m_DxContext->Present(g_RenderingSettings.EnableVSync);
 
-	m_CurrFrameResourceIndex = (m_CurrFrameResourceIndex + 1) % NUM_FRAMES_IN_FLIGHT;
 	if (!g_RenderingSettings.DebugVoxel)
 		m_FirstFrame = false;
 }
@@ -834,8 +830,8 @@ void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 	float haltonY = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 3) - 1.0f;
 	float jitterX = (haltonX / m_Width);
 	float jitterY = (haltonY / m_Height);
-	// jitterX = 0.0f;
-	// jitterY = 0.0f;
+	jitterX = 0.0f;
+	jitterY = 0.0f;
 
 	XMMATRIX view = m_Camera.GetView();
 	XMMATRIX proj = m_Camera.GetProj();

@@ -26,7 +26,7 @@ void DxContext::Present(bool vsync)
 	int sync = vsync ? 1 : 0;
 	int flag = vsync ? 0 : (m_TearingSupported ? DXGI_PRESENT_ALLOW_TEARING : 0);
 
-	ThrowIfFailed(m_SwapChain->Present(sync, 0));
+	ThrowIfFailed(m_SwapChain->Present(sync, flag));
 
 	m_CurrBackBuffer = (m_CurrBackBuffer + 1) % NUM_FRAMES_IN_FLIGHT;
 }
@@ -84,25 +84,24 @@ void DxContext::CreateDevice()
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
 
 		// Suppress whole categories of messages
-		//D3D12_MESSAGE_CATEGORY Categories[] = {};
+		// D3D12_MESSAGE_CATEGORY Categories[] = {};
 
 		// Suppress messages based on their severity level
 		D3D12_MESSAGE_SEVERITY Severities[] =
-		{
-			D3D12_MESSAGE_SEVERITY_INFO
-		};
+			{
+				D3D12_MESSAGE_SEVERITY_INFO};
 
 		// Suppress individual messages by their ID
 		D3D12_MESSAGE_ID DenyIds[] = {
-			D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,   // I'm really not sure how to avoid this message.
-			D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                         // This warning occurs when using capture frame while graphics debugging.
-			D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                       // This warning occurs when using capture frame while graphics debugging.
+			D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE, // I'm really not sure how to avoid this message.
+			D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,						  // This warning occurs when using capture frame while graphics debugging.
+			D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,					  // This warning occurs when using capture frame while graphics debugging.
 			D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE,
 		};
 
 		D3D12_INFO_QUEUE_FILTER NewFilter = {};
-		//NewFilter.DenyList.NumCategories = _countof(Categories);
-		//NewFilter.DenyList.pCategoryList = Categories;
+		// NewFilter.DenyList.NumCategories = _countof(Categories);
+		// NewFilter.DenyList.pCategoryList = Categories;
 		NewFilter.DenyList.NumSeverities = _countof(Severities);
 		NewFilter.DenyList.pSeverityList = Severities;
 		NewFilter.DenyList.NumIDs = _countof(DenyIds);
@@ -140,7 +139,7 @@ void DxContext::CreateSwapChain()
 	desc.Height = m_Height;
 	desc.Format = BACK_BUFFER_FORMAT;
 	desc.Stereo = FALSE;
-	desc.SampleDesc = { 1, 0 };
+	desc.SampleDesc = {1, 0};
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.BufferCount = NUM_FRAMES_IN_FLIGHT;
 	desc.Scaling = DXGI_SCALING_STRETCH;
@@ -163,15 +162,11 @@ void DxContext::CreateSwapChain()
 void DxContext::CreateDescriptorHeaps()
 {
 	// +1 for the screen normal map, +2 for ambient maps, +2 for post processing, +5 for defered rendering, +1 for velocity buffer
-	m_RtvHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {
-		D3D12_DESCRIPTOR_HEAP_TYPE_RTV, NUM_FRAMES_IN_FLIGHT + 11, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0 });
+	m_RtvHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {D3D12_DESCRIPTOR_HEAP_TYPE_RTV, NUM_FRAMES_IN_FLIGHT + 11, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0});
 	// +1 for the depth stencil buffer, +4 for the cascade shadow map
-	m_DsvHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {
-		D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 5, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0 });
-	m_CbvSrvUavHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {
-		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1024, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0 });
-	m_ImGuiHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {
-		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, NUM_FRAMES_IN_FLIGHT, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0 });
+	m_DsvHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 5, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0});
+	m_CbvSrvUavHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1024, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0});
+	m_ImGuiHeap = DescriptorHeap::CreateDescriptorHeap(m_Device, {D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, NUM_FRAMES_IN_FLIGHT, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0});
 }
 
 void DxContext::AllocateDescriptors()
@@ -230,7 +225,7 @@ void DxContext::ResizeSwapChain()
 
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 	{
-		auto& bufferTex = m_SwapChainBuffer[i];
+		auto &bufferTex = m_SwapChainBuffer[i];
 		ThrowIfFailed(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&bufferTex.Resource)));
 		m_Device->CreateRenderTargetView(bufferTex.Resource.Get(), nullptr, bufferTex.Rtv.CPUHandle);
 		m_Device->CreateShaderResourceView(bufferTex.Resource.Get(), &srvDesc, bufferTex.Srv.CPUHandle);
@@ -257,7 +252,7 @@ void DxContext::ResizeDepthStencilBuffer(GraphicsCommandList commandList)
 	// we need to create the depth buffer resource with a typeless format.
 	depthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 
-	depthStencilDesc.SampleDesc = { 1, 0 };
+	depthStencilDesc.SampleDesc = {1, 0};
 	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
@@ -284,7 +279,7 @@ void DxContext::ResizeDepthStencilBuffer(GraphicsCommandList commandList)
 
 	// Transition the resource from its initial state to be used as a depth buffer.
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_DepthStencilBuffer.Resource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	// Create depth buffer shader resource view
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
