@@ -18,7 +18,7 @@ cbuffer PassCB : register(b1)
     float4x4 g_ViewProj;
     float4x4 g_PrevViewProj;
     float4x4 g_InvViewProj;
-    float4x4 g_ViewProjTex;
+    float4x4 g_ProjTex;
     float3 g_EyePosW;
     float _Pad1;
     float2 g_RenderTargetSize;

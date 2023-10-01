@@ -87,20 +87,6 @@ void PipelineStates::BuildPSOs(Device device)
         ThrowIfFailed(device->CreateGraphicsPipelineState(&skyboxDesc, IID_PPV_ARGS(&m_PSOs["skybox"])));
     }
 
-    // depth prepass and velocity buffer
-    {
-        Shader VS = Utils::CompileShader(L"shaders\\velocity.hlsl", nullptr, L"VS", L"vs_6_6");
-        Shader PS = Utils::CompileShader(L"shaders\\velocity.hlsl", nullptr, L"PS", L"ps_6_6");
-
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC velocityDesc = graphicsDesc;
-        velocityDesc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
-        velocityDesc.RTVFormats[0] = VELOCITY_BUFFER_FORMAT;
-        velocityDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
-        velocityDesc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
-
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&velocityDesc, IID_PPV_ARGS(&m_PSOs["depthPrepass"])));
-    }
-
     // shadow pass
     {
         Shader VS = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, L"VS", L"vs_6_6");
@@ -117,6 +103,27 @@ void PipelineStates::BuildPSOs(Device device)
         shadowPassDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 
         ThrowIfFailed(device->CreateGraphicsPipelineState(&shadowPassDesc, IID_PPV_ARGS(&m_PSOs["shadow"])));
+    }
+
+    // gbuffer pass
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC gbufferDesc = graphicsDesc;
+        gbufferDesc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
+        gbufferDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        gbufferDesc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        gbufferDesc.NumRenderTargets = 6;
+        gbufferDesc.RTVFormats[0] = GBUFFER_ALBEDO_FORMAT;
+        gbufferDesc.RTVFormats[1] = GBUFFER_NORMAL_FORMAT;
+        gbufferDesc.RTVFormats[2] = GBUFFER_METALNESS_FORMAT;
+        gbufferDesc.RTVFormats[3] = GBUFFER_ROUGHNESS_FORMAT;
+        gbufferDesc.RTVFormats[4] = GBUFFER_AMBIENT_FORMAT;
+        gbufferDesc.RTVFormats[5] = GBUFFER_VELOCITY_FORMAT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&gbufferDesc, IID_PPV_ARGS(&m_PSOs["gbuffer"])));
     }
 }
 

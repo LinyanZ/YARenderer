@@ -42,11 +42,10 @@ void Renderer::BuildResources()
 {
 	m_GBufferAlbedo = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_ALBEDO_FORMAT, 1);
 	m_GBufferNormal = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_NORMAL_FORMAT, 1);
-	m_GBufferAmbient = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_AMBIENT_FORMAT, 1);
-	m_GBufferRoughness = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_ROUGHNESS_FORMAT, 1);
 	m_GBufferMetalness = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_METALNESS_FORMAT, 1);
-
-	m_VelocityBuffer = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, VELOCITY_BUFFER_FORMAT, 1);
+	m_GBufferRoughness = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_ROUGHNESS_FORMAT, 1);
+	m_GBufferAmbient = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_AMBIENT_FORMAT, 1);
+	m_GBufferVelocity = Texture::Create(m_DxContext->GetDevice(), m_Width, m_Height, 1, GBUFFER_VELOCITY_FORMAT, 1);
 }
 
 void Renderer::AllocateDescriptors()
@@ -56,15 +55,14 @@ void Renderer::AllocateDescriptors()
 	m_GBufferMetalness.Rtv = m_DxContext->GetRtvHeap().Alloc();
 	m_GBufferRoughness.Rtv = m_DxContext->GetRtvHeap().Alloc();
 	m_GBufferAmbient.Rtv = m_DxContext->GetRtvHeap().Alloc();
+	m_GBufferVelocity.Rtv = m_DxContext->GetRtvHeap().Alloc();
 
 	m_GBufferAlbedo.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
 	m_GBufferNormal.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
 	m_GBufferMetalness.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
 	m_GBufferRoughness.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
 	m_GBufferAmbient.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
-
-	m_VelocityBuffer.Rtv = m_DxContext->GetRtvHeap().Alloc();
-	m_VelocityBuffer.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
+	m_GBufferVelocity.Srv = m_DxContext->GetCbvSrvUavHeap().Alloc();
 }
 
 void Renderer::BuildDescriptors()
@@ -84,8 +82,8 @@ void Renderer::BuildDescriptors()
 	m_GBufferAmbient.CreateSrv(m_DxContext->GetDevice(), D3D12_SRV_DIMENSION_TEXTURE2D, 0, 1);
 	m_GBufferAmbient.CreateRtv(m_DxContext->GetDevice(), D3D12_RTV_DIMENSION_TEXTURE2D);
 
-	m_VelocityBuffer.CreateSrv(m_DxContext->GetDevice(), D3D12_SRV_DIMENSION_TEXTURE2D, 0, 1);
-	m_VelocityBuffer.CreateRtv(m_DxContext->GetDevice(), D3D12_RTV_DIMENSION_TEXTURE2D);
+	m_GBufferVelocity.CreateSrv(m_DxContext->GetDevice(), D3D12_SRV_DIMENSION_TEXTURE2D, 0, 1);
+	m_GBufferVelocity.CreateRtv(m_DxContext->GetDevice(), D3D12_RTV_DIMENSION_TEXTURE2D);
 }
 
 void Renderer::Setup()
@@ -140,11 +138,9 @@ void Renderer::Render()
 	auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::ShadowCB, shadowCB->GetGPUVirtualAddress());
 
-	DepthPrepass(commandList);	// depth prepass and velocity buffer
 	ShadowMapPass(commandList); // cascaded shadow from directional light
 
-	commandList->RSSetViewports(1, &m_ScreenViewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
+	GBufferPass(commandList);
 
 	commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, Colors::Black, 0, nullptr);
 	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
@@ -179,7 +175,12 @@ void Renderer::Render()
 	// 	m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
 	// }
 
-	Debug(commandList, m_VelocityBuffer.Srv, 0);
+	Debug(commandList, m_GBufferAlbedo.Srv, 0);
+	Debug(commandList, m_GBufferNormal.Srv, 1);
+	Debug(commandList, m_GBufferMetalness.Srv, 2);
+	Debug(commandList, m_GBufferRoughness.Srv, 3);
+	Debug(commandList, m_GBufferAmbient.Srv, 4);
+	Debug(commandList, m_GBufferVelocity.Srv, 5);
 	Debug(commandList, m_CascadedShadowMap->Srv(0), 12);
 	Debug(commandList, m_CascadedShadowMap->Srv(1), 13);
 	Debug(commandList, m_CascadedShadowMap->Srv(2), 14);
@@ -339,11 +340,11 @@ void Renderer::ForwardRendering(GraphicsCommandList commandList)
 
 	// Draw Opague Objects
 	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRendering").Get());
-	DrawRenderItems(commandList, RenderPass::ForwardRendering, false);
+	DrawRenderItems(commandList, false);
 
 	// Draw transparent objects
 	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRenderingTransparent").Get());
-	DrawRenderItems(commandList, RenderPass::ForwardRendering, true);
+	DrawRenderItems(commandList, true);
 }
 
 void Renderer::DeferredRendering(GraphicsCommandList commandList)
@@ -372,7 +373,11 @@ void Renderer::DeferredRendering(GraphicsCommandList commandList)
 
 void Renderer::GBufferPass(GraphicsCommandList commandList)
 {
-	// Indicate a state transition on the resource usage.
+	commandList->RSSetViewports(1, &m_ScreenViewport);
+	commandList->RSSetScissorRects(1, &m_ScissorRect);
+
+	commandList->SetPipelineState(PipelineStates::GetPSO("gbuffer"));
+
 	D3D12_RESOURCE_BARRIER preBarriers[] =
 		{
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAlbedo.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
@@ -380,29 +385,22 @@ void Renderer::GBufferPass(GraphicsCommandList commandList)
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferMetalness.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferRoughness.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAmbient.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferVelocity.Resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET),
 		};
-	commandList->ResourceBarrier(5, preBarriers);
+	commandList->ResourceBarrier(6, preBarriers);
 
-	// Clear the background.
 	commandList->ClearRenderTargetView(m_GBufferAlbedo.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
 	commandList->ClearRenderTargetView(m_GBufferNormal.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
 	commandList->ClearRenderTargetView(m_GBufferMetalness.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
 	commandList->ClearRenderTargetView(m_GBufferRoughness.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
 	commandList->ClearRenderTargetView(m_GBufferAmbient.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
+	commandList->ClearRenderTargetView(m_GBufferVelocity.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 0.0f}, 0, nullptr);
 	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
-	// Specify the buffers we are going to render to.
-	commandList->OMSetRenderTargets(5, &m_GBufferAlbedo.Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
-
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("gbuffer").Get());
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("gbuffer").Get());
-
-	// Bind pass constant buffer
-	auto passCB = CurrFrameResource()->PassCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+	commandList->OMSetRenderTargets(6, &m_GBufferAlbedo.Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 
 	// Bind IBL textures
-	commandList->SetGraphicsRootDescriptorTable(7, m_EnvironmentMap->GetIrMap().Srv.GPUHandle);
+	// commandList->SetGraphicsRootDescriptorTable(7, m_EnvironmentMap->GetIrMap().Srv.GPUHandle);
 
 	DrawRenderItems(commandList);
 
@@ -413,8 +411,9 @@ void Renderer::GBufferPass(GraphicsCommandList commandList)
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferMetalness.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferRoughness.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
 			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferAmbient.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
+			CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferVelocity.Resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON),
 		};
-	commandList->ResourceBarrier(5, postBarriers);
+	commandList->ResourceBarrier(6, postBarriers);
 }
 
 void Renderer::AmbientLightPass(GraphicsCommandList commandList)
@@ -518,13 +517,13 @@ void Renderer::DrawNormalsAndDepth(GraphicsCommandList commandList)
 	auto passCB = CurrFrameResource()->PassCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-	DrawRenderItems(commandList, RenderPass::NormalOnly);
+	DrawRenderItems(commandList);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(),
 																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 }
 
-void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass, bool transparent)
+void Renderer::DrawRenderItems(GraphicsCommandList commandList, bool transparent)
 {
 	auto objectCB = CurrFrameResource()->ObjectCB->GetResource();
 	UINT objCBByteSize = Utils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
@@ -534,7 +533,7 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 
 	for (auto &ritem : m_RenderItems)
 	{
-		// Set object constant buffer
+		// set object constant buffer
 		auto objCBAddress = objectCB->GetGPUVirtualAddress() + ritem->objCBIndex * objCBByteSize;
 		commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::ObjectCB, objCBAddress);
 
@@ -545,41 +544,16 @@ void Renderer::DrawRenderItems(GraphicsCommandList commandList, RenderPass pass,
 
 		for (const auto &submesh : mesh->SubMeshes())
 		{
-			// Set material constant buffer
+			if (submesh.Transparent != transparent)
+				continue;
+
+			// set material constant buffer
 			auto matCBAddress = matCB->GetGPUVirtualAddress() + (submesh.MaterialIndex + ritem->matCBIndex) * matCBByteSize;
 			auto &material = mesh->Materials()[submesh.MaterialIndex];
 
-			switch (pass)
-			{
-			case RenderPass::NormalOnly:
-				commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::MatCB, matCBAddress);
-				if (material.HasNormalTexture)
-					commandList->SetGraphicsRootDescriptorTable(3, material.NormalTexture.Srv.GPUHandle);
-				break;
-			case RenderPass::ForwardRendering:
-				// Skip transparent objects for opague rendering (and vice versa)
-				if (submesh.Transparent != transparent)
-					continue;
-
-				commandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
-				if (material.HasAlbedoTexture)
-					commandList->SetGraphicsRootDescriptorTable(3, material.AlbedoTexture.Srv.GPUHandle);
-				if (material.HasNormalTexture)
-					commandList->SetGraphicsRootDescriptorTable(4, material.NormalTexture.Srv.GPUHandle);
-				if (material.HasMetalnessTexture)
-					commandList->SetGraphicsRootDescriptorTable(5, material.MetalnessTexture.Srv.GPUHandle);
-				if (material.HasRoughnessTexture)
-					commandList->SetGraphicsRootDescriptorTable(6, material.RoughnessTexture.Srv.GPUHandle);
-				break;
-			case RenderPass::Shadow:
-			case RenderPass::Velocity:
-			default:
-				break;
-			}
-
+			commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::MatCB, matCBAddress);
 			commandList->DrawIndexedInstanced(submesh.IndexCount, 1,
 											  submesh.StartIndexLocation, submesh.BaseVertexLocation, 0);
-			;
 		}
 	}
 }
@@ -605,7 +579,7 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 										   D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 		commandList->OMSetRenderTargets(0, nullptr, false, &m_CascadedShadowMap->Dsv(i).CPUHandle);
 
-		DrawRenderItems(commandList, RenderPass::Shadow);
+		DrawRenderItems(commandList);
 	}
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_CascadedShadowMap->GetResource(),
@@ -625,26 +599,6 @@ void Renderer::DrawSkybox(GraphicsCommandList commandList)
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	commandList->DrawIndexedInstanced(m_Skybox->SubMeshes()[0].IndexCount, 1, 0, 0, 0);
-}
-
-void Renderer::DepthPrepass(GraphicsCommandList commandList)
-{
-	commandList->RSSetViewports(1, &m_ScreenViewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
-
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VelocityBuffer.Resource.Get(),
-																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-	commandList->ClearRenderTargetView(m_VelocityBuffer.Rtv.CPUHandle, XMVECTORF32{0.0f, 0.0f, 0.0f, 1.0f}, 0, nullptr);
-	commandList->OMSetRenderTargets(1, &m_VelocityBuffer.Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
-
-	commandList->SetPipelineState(PipelineStates::GetPSO("depthPrepass"));
-
-	DrawRenderItems(commandList, RenderPass::Velocity);
-
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_VelocityBuffer.Resource.Get(),
-																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 }
 
 void Renderer::ClearVoxel(GraphicsCommandList commandList)
@@ -684,7 +638,7 @@ void Renderer::VoxelizeScene(GraphicsCommandList commandList)
 	// Bind volumn texture albedo
 	commandList->SetGraphicsRootDescriptorTable(10, m_VolumeAlbedo.Uav[0].GPUHandle);
 
-	DrawRenderItems(commandList, RenderPass::ForwardRendering, false);
+	DrawRenderItems(commandList, false);
 }
 
 void Renderer::DebugVoxel(GraphicsCommandList commandList)
@@ -1003,10 +957,9 @@ void Renderer::OnResize(UINT width, UINT height)
 void Renderer::ResizeResources()
 {
 	m_GBufferAlbedo.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
-	m_GBufferAmbient.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
+	m_GBufferNormal.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
 	m_GBufferMetalness.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
 	m_GBufferRoughness.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
-	m_GBufferNormal.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
-
-	m_VelocityBuffer.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
+	m_GBufferAmbient.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
+	m_GBufferVelocity.Resize(m_DxContext->GetDevice(), m_Width, m_Height);
 }

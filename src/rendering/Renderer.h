@@ -25,7 +25,7 @@
 
 #include "vxgi/VolumeTexture.h"
 
-#define SPONZA_SCENE 0
+#define SPONZA_SCENE 1
 #define TEST_SCENE (!SPONZA_SCENE)
 
 #define FORWARD_RENDERING 1
@@ -33,14 +33,6 @@
 #define FORWARD_PLUS_RENDERING 0
 
 #define VOXEL_DIMENSION 512
-
-enum class RenderPass
-{
-	NormalOnly = 0,
-	Shadow,
-	ForwardRendering,
-	Velocity
-};
 
 struct RenderItem
 {
@@ -115,9 +107,8 @@ private:
 
 	void DrawNormalsAndDepth(GraphicsCommandList commandList);
 	void ShadowMapPass(GraphicsCommandList commandList);
-	void DrawRenderItems(GraphicsCommandList commandList, RenderPass pass = RenderPass::ForwardRendering, bool transparent = false);
+	void DrawRenderItems(GraphicsCommandList commandList, bool transparent = false);
 	void DrawSkybox(GraphicsCommandList commandList);
-	void DepthPrepass(GraphicsCommandList commandList);
 
 	void ClearVoxel(GraphicsCommandList commandList);
 	void VoxelizeScene(GraphicsCommandList commandList);
@@ -158,23 +149,19 @@ private:
 
 	std::vector<Light> m_Lights;
 
-	Texture m_VelocityBuffer;
+	Texture m_GBufferAlbedo;
+	Texture m_GBufferNormal;
+	Texture m_GBufferMetalness;
+	Texture m_GBufferRoughness;
+	Texture m_GBufferAmbient;
+	Texture m_GBufferVelocity;
+
 	XMMATRIX m_PrevViewProjMatrix;
 	UINT m_JitterIndex = 0;
 	float m_PreviousJitterX = 0;
 	float m_PreviousJitterY = 0;
 
 	bool m_FirstFrame = true;
-
-	//
-	// Defered rendering
-	//
-
-	Texture m_GBufferAlbedo;
-	Texture m_GBufferNormal;
-	Texture m_GBufferMetalness;
-	Texture m_GBufferRoughness;
-	Texture m_GBufferAmbient;
 
 	// VXGI
 	VolumeTexture m_VolumeAlbedo;

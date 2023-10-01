@@ -11,10 +11,10 @@ struct Material
     float Roughness;
     float2 Padding;
     //-------------------------- ( 16 bytes )
-    bool HasAlbedoTexture;
-    bool HasNormalTexture;
-    bool HasMetalnessTexture;
-    bool HasRoughnessTexture;
+    uint AlbedoTexIndex;
+    uint NormalTexIndex;
+    uint MetalnessTexIndex;
+    uint RoughnessTexIndex;
     //-------------------------- ( 16 bytes )
 };  //-------------------------- ( 16 * 5 = 80 bytes )
 
