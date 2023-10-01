@@ -125,6 +125,21 @@ void PipelineStates::BuildPSOs(Device device)
 
         ThrowIfFailed(device->CreateGraphicsPipelineState(&gbufferDesc, IID_PPV_ARGS(&m_PSOs["gbuffer"])));
     }
+
+    // deferred lighting pass
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\deferredLighting.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\deferredLighting.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredLightingDesc = graphicsDesc;
+        deferredLightingDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        deferredLightingDesc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        deferredLightingDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        deferredLightingDesc.DepthStencilState.DepthEnable = false;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&deferredLightingDesc, IID_PPV_ARGS(&m_PSOs["deferredLighting"])));
+    }
 }
 
 std::vector<CD3DX12_STATIC_SAMPLER_DESC> PipelineStates::GetStaticSamplers()

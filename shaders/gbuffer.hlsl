@@ -73,13 +73,13 @@ VertexOut VS(VertexIn vin)
     return vout;
 }
 
-float3 GetAlbedo(float2 texCoord)
+float4 GetAlbedo(float2 texCoord)
 {
-    float3 albedo = g_Material.Albedo.rgb;
+    float4 albedo = float4(g_Material.Albedo.rgb, 1.0);
     if (g_Material.AlbedoTexIndex != -1)
     {
         Texture2D<float4> albedoTexture = ResourceDescriptorHeap[g_Material.AlbedoTexIndex];
-        albedo *= albedoTexture.Sample(g_SamplerAnisotropicWrap, texCoord).rgb;
+        albedo *= albedoTexture.Sample(g_SamplerAnisotropicWrap, texCoord);
     }
     return albedo;
 }
@@ -135,16 +135,16 @@ PixelOut PS(VertexOut pin)
 {
     PixelOut pout;
     
-    float3 albedo = GetAlbedo(pin.TexCoord);
+    float4 albedo = GetAlbedo(pin.TexCoord);
     float3 normal = GetNormal(pin.NormalV, pin.TangentV, pin.BitangentV, pin.TexCoord);
     float metalness = GetMetalness(pin.TexCoord);
     float roughness = GetRoughness(pin.TexCoord);
     
-    pout.Albedo = float4(albedo, 1.0f);
+    pout.Albedo = albedo;
     pout.NormalVS = float4(normal, 0.0f);
     pout.Metalness = metalness;
     pout.Roughness = roughness;
-    pout.Ambient = float4(0.2.xxx, 1);  // temporary
+    pout.Ambient = float4(0.05.xxx, 1);  // temporary
 
     float3 currPosNDC = pin.CurrPositionH.xyz / pin.CurrPositionH.w;
     float3 prevPosNDC = pin.PrevPositionH.xyz / pin.PrevPositionH.w;

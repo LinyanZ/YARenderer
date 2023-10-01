@@ -43,6 +43,14 @@ static const float2 gTexCoords[6] =
     float2(1.0f, 1.0f)
 };
 
+
+struct VertexOut
+{
+    float3 PositionV        : POSITION1;        // view space position
+    float2 TexCoord         : TEXCOORD0;        // texture coordinate
+    float4 PositionH        : SV_POSITION;      // clip space position
+};
+
 VertexOut VS(uint vid : SV_VertexID)
 {
     VertexOut vout;

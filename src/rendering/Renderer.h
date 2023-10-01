@@ -25,7 +25,7 @@
 
 #include "vxgi/VolumeTexture.h"
 
-#define SPONZA_SCENE 1
+#define SPONZA_SCENE 0
 #define TEST_SCENE (!SPONZA_SCENE)
 
 #define FORWARD_RENDERING 1
@@ -54,6 +54,16 @@ struct SkyBoxRenderResources
 struct ShadowRenderResources
 {
 	UINT CascadeIndex;
+};
+
+struct DeferredLightingRenderResources
+{
+	UINT AlbedoTexIndex;
+	UINT NormalTexIndex;
+	UINT MetalnessTexIndex;
+	UINT RoughnessTexIndex;
+	UINT AmbientTexIndex;
+	UINT DepthTexIndex;
 };
 
 struct Renderer
@@ -104,6 +114,7 @@ private:
 	void GBufferPass(GraphicsCommandList commandList);
 	void AmbientLightPass(GraphicsCommandList commandList);
 	void LightingPass(GraphicsCommandList commandList);
+	void DeferredLightingPass(GraphicsCommandList commandList);
 
 	void DrawNormalsAndDepth(GraphicsCommandList commandList);
 	void ShadowMapPass(GraphicsCommandList commandList);

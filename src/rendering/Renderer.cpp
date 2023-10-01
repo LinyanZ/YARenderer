@@ -134,16 +134,23 @@ void Renderer::Render()
 	auto passCB = CurrFrameResource()->PassCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::PassCB, passCB->GetGPUVirtualAddress());
 
+	// bind lighting data
+	auto lightCB = CurrFrameResource()->LightBuffer->GetResource();
+	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::LightCB, lightCB->GetGPUVirtualAddress());
+
 	// set shadow constant buffer
 	auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::ShadowCB, shadowCB->GetGPUVirtualAddress());
 
-	ShadowMapPass(commandList); // cascaded shadow from directional light
+	// cascaded shadow from directional light
+	ShadowMapPass(commandList);
 
 	GBufferPass(commandList);
 
 	commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, Colors::Black, 0, nullptr);
 	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
+
+	DeferredLightingPass(commandList);
 
 	DrawSkybox(commandList);
 
@@ -175,16 +182,16 @@ void Renderer::Render()
 	// 	m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
 	// }
 
-	Debug(commandList, m_GBufferAlbedo.Srv, 0);
-	Debug(commandList, m_GBufferNormal.Srv, 1);
-	Debug(commandList, m_GBufferMetalness.Srv, 2);
-	Debug(commandList, m_GBufferRoughness.Srv, 3);
-	Debug(commandList, m_GBufferAmbient.Srv, 4);
-	Debug(commandList, m_GBufferVelocity.Srv, 5);
-	Debug(commandList, m_CascadedShadowMap->Srv(0), 12);
-	Debug(commandList, m_CascadedShadowMap->Srv(1), 13);
-	Debug(commandList, m_CascadedShadowMap->Srv(2), 14);
-	Debug(commandList, m_CascadedShadowMap->Srv(3), 15);
+	// Debug(commandList, m_GBufferAlbedo.Srv, 0);
+	// Debug(commandList, m_GBufferNormal.Srv, 1);
+	// Debug(commandList, m_GBufferMetalness.Srv, 2);
+	// Debug(commandList, m_GBufferRoughness.Srv, 3);
+	// Debug(commandList, m_GBufferAmbient.Srv, 4);
+	// Debug(commandList, m_GBufferVelocity.Srv, 5);
+	// Debug(commandList, m_CascadedShadowMap->Srv(0), 12);
+	// Debug(commandList, m_CascadedShadowMap->Srv(1), 13);
+	// Debug(commandList, m_CascadedShadowMap->Srv(2), 14);
+	// Debug(commandList, m_CascadedShadowMap->Srv(3), 15);
 }
 
 void Renderer::EndFrame()
@@ -500,6 +507,26 @@ void Renderer::LightingPass(GraphicsCommandList commandList)
 	}
 }
 
+void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
+{
+	commandList->SetPipelineState(PipelineStates::GetPSO("deferredLighting"));
+
+	DeferredLightingRenderResources resources{
+		m_GBufferAlbedo.Srv.Index,
+		m_GBufferNormal.Srv.Index,
+		m_GBufferMetalness.Srv.Index,
+		m_GBufferRoughness.Srv.Index,
+		m_GBufferAmbient.Srv.Index,
+		m_DxContext->DepthStencilBuffer().Srv.Index};
+
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 6,
+											   reinterpret_cast<void *>(&resources), 0);
+
+	// fullscreen triangle
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->DrawInstanced(3, 1, 0, 0);
+}
+
 void Renderer::DrawNormalsAndDepth(GraphicsCommandList commandList)
 {
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(),
@@ -571,9 +598,9 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 	for (UINT i = 0; i < NUM_CASCADES; i++)
 	{
 		// Bind cascade shadow index
-		ShadowRenderResources shadowRenderResources{i};
+		ShadowRenderResources resources{i};
 		commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1,
-												   reinterpret_cast<void *>(&shadowRenderResources), 0);
+												   reinterpret_cast<void *>(&resources), 0);
 
 		commandList->ClearDepthStencilView(m_CascadedShadowMap->Dsv(i).CPUHandle,
 										   D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
@@ -588,11 +615,11 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 
 void Renderer::DrawSkybox(GraphicsCommandList commandList)
 {
-	SkyBoxRenderResources skyBoxRenderResource{m_EnvironmentMap->GetEnvMap().Srv.Index};
+	SkyBoxRenderResources resources{m_EnvironmentMap->GetEnvMap().Srv.Index};
 
 	commandList->SetPipelineState(PipelineStates::GetPSO("skybox"));
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1,
-											   reinterpret_cast<void *>(&skyBoxRenderResource), 0);
+											   reinterpret_cast<void *>(&resources), 0);
 
 	commandList->IASetVertexBuffers(0, 1, &m_Skybox->VertexBufferView());
 	commandList->IASetIndexBuffer(&m_Skybox->IndexBufferView());

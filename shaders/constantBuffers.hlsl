@@ -37,6 +37,8 @@ cbuffer MatCB : register(b2)
     Material g_Material; 
 };
 
+ConstantBuffer<Light> LightCB[1] : register(b3);
+
 cbuffer ShadowCB : register(b4)
 {
     ShadowData g_ShadowData;
