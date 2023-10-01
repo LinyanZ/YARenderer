@@ -1,6 +1,8 @@
 #include "renderResources.hlsl"
 #include "constantBuffers.hlsl"
 #include "lightingUtils.hlsl"
+#include "samplers.hlsl"
+#include "cascadedShadow.hlsl"
 
 ConstantBuffer<DeferredLightingRenderResources> g_Resources : register(b6);
 
@@ -22,26 +24,20 @@ VertexOut VS(uint vertexID : SV_VertexID)
     return vout;
 }
 
-// convert clip space coordinates to view space
-float4 ClipToView(float4 clip)
-{
-    // View space position.
-    float4 view = mul(clip, g_InvProj);
-    // Perspective projection.
-    view = view / view.w;
- 
-    return view;
-}
-
 // convert screen space coordinates to view space.
 float4 ScreenToView(float4 screen)
 {
-    // Convert to normalized texture coordinates
+    // convert to normalized texture coordinates
     float2 texCoord = screen.xy * g_InvRenderTargetSize;
  
-    // Convert to clip space
+    // convert to clip space
     float4 clip = float4(float2(texCoord.x, 1.0f - texCoord.y) * 2.0f - 1.0f, screen.z, screen.w);
-    return ClipToView(clip);
+
+    // view space position
+    float4 view = mul(clip, g_InvProj);
+    view /= view.w;
+
+    return view;
 }
 
 float4 PS(VertexOut pin) : SV_Target
@@ -54,6 +50,7 @@ float4 PS(VertexOut pin) : SV_Target
     Texture2D<float> roughnessTex = ResourceDescriptorHeap[g_Resources.RoughnessTexIndex];
     Texture2D<float4> ambientTex = ResourceDescriptorHeap[g_Resources.AmbientTexIndex];
     Texture2D<float> depthTex = ResourceDescriptorHeap[g_Resources.DepthTexIndex];
+    Texture2DArray shadowMap = ResourceDescriptorHeap[g_Resources.ShadowMapTexIndex];
 
     float4 albedoCol = albedoTex.Load(int3(texCoord, 0));
     float3 albedo = albedoCol.rgb;
@@ -67,17 +64,32 @@ float4 PS(VertexOut pin) : SV_Target
     float depth = depthTex.Load(int3(texCoord, 0));
     float3 positionV = ScreenToView(float4(texCoord, depth, 1.0f)).xyz;
 
-    float3 directLighting = 0;
-    float shadowFactor = 1.0;
+    float2 cascadeShadowResult = CascadeShadowWithPCSS(shadowMap, positionV);
+    float shadowFactor = cascadeShadowResult[0];
+    float cascadeIndex = cascadeShadowResult[1];
+    
+    float3 directLighting = float3(0, 0, 0);
+    
+    if (g_ShadowData.ShowCascades)
+    {
+        if (cascadeIndex == 0)
+            directLighting += float3(0.8, 0, 0);
+        else if (cascadeIndex == 1)
+            directLighting += float3(0, 0.8, 0);
+        else if (cascadeIndex == 2)
+            directLighting += float3(0, 0, 0.8);
+        else if (cascadeIndex == 3)
+            directLighting += float3(0.8, 0.8, 0);
+    }
 
-    [loop] // Unrolling produces strange behaviour so adding the [loop] attribute.
+    [loop] // unrolling produces strange behaviour so adding the [loop] attribute
     for (int i = 0; i < 1; i++)
     {
-        // Skip lights that are not enabled.
+        // skip lights that are not enabled
         if (!LightCB[i].Enabled)
             continue;
         
-        // Skip point and spot lights that are out of range of the point being shaded.
+        // skip point and spot lights that are out of range of the point being shaded
         if (LightCB[i].Type != DIRECTIONAL_LIGHT &&
             length(LightCB[i].PositionVS.xyz - positionV) > LightCB[i].Range)
             continue;
@@ -98,5 +110,5 @@ float4 PS(VertexOut pin) : SV_Target
         }
     }
 
-    return float4(directLighting + ambient, alpha);
+    return float4(directLighting + ambient * albedo, alpha);
 }

@@ -163,11 +163,3 @@ target_precompile_headers(
     PRIVATE
     "src/pch.h"
 )
-
-set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-
-# copy the executable to bin/ folder after build
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}.exe
-    COMMENT "Created ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}.exe"
-)

@@ -1,5 +1,6 @@
 #include "common.hlsl"
 #include "structs.hlsl"
+#include "samplers.hlsl"
 
 #define SHADOW_MAP_SIZE 4096
 #define NUM_CASCADES 4
@@ -15,7 +16,7 @@ float Random(float2 seed)
     return frac(sin(dot(seed, float2(12.9898, 78.233))) * 43758.5453);
 }
 
-// Taken from https://www.gamedev.net/tutorials/programming/graphics/contact-hardening-soft-shadows-made-fast-r4906/
+// taken from https://www.gamedev.net/tutorials/programming/graphics/contact-hardening-soft-shadows-made-fast-r4906/
 void VogelDiskSamples(float2 seed, int sampleCount)
 {
     float phi = Random(seed) * TwoPI;
@@ -33,7 +34,7 @@ void VogelDiskSamples(float2 seed, int sampleCount)
     }
 }
 
-// Taken from Games202 homework framework: https://sites.cs.ucsb.edu/~lingqi/teaching/games202.html
+// taken from Games202 homework framework: https://sites.cs.ucsb.edu/~lingqi/teaching/games202.html
 void PoissonDiskSamples(float2 seed, int sampleCount)
 {
     float angleStep = TwoPI * float(NUM_RINGS) / float(sampleCount);
@@ -51,25 +52,24 @@ void PoissonDiskSamples(float2 seed, int sampleCount)
     }
 }
 
-float FindBlocker(Texture2DArray cascadeShadowMap, int cascadeIndex, SamplerState pointSampler, 
-                  float2 uv, float depth, ShadowData shadowData)
+float FindBlocker(Texture2DArray cascadeShadowMap, int cascadeIndex, float2 uv, float depth)
 {
-    float firstCascadeRadius = ((float[4]) shadowData.CascadeRadius)[0];
-    float currentCascadeRadius = ((float[4]) shadowData.CascadeRadius)[cascadeIndex];
+    float firstCascadeRadius = ((float[4]) g_ShadowData.CascadeRadius)[0];
+    float currentCascadeRadius = ((float[4]) g_ShadowData.CascadeRadius)[cascadeIndex];
     float cascadeRatio = firstCascadeRadius / currentCascadeRadius;
     
     // It appears that the shadow implementation in Nvidia's whitepaper is using perspective projection.
-    // The original formula is (depth - NEAR_PLANE) / depth * shadowData.ShadowSoftness * LIGHT_SIZE * cascadeRatio.
+    // The original formula is (depth - NEAR_PLANE) / depth * g_ShadowData.ShadowSoftness * LIGHT_SIZE * cascadeRatio.
     // However, I'm using orthogonal projection for shadow mapping, where the size of the light remains consistent regardless of the near plane value.
     // Hence the formula is simplified.
-    float searchWidth = shadowData.ShadowSoftness * LIGHT_SIZE * cascadeRatio;
+    float searchWidth = g_ShadowData.ShadowSoftness * LIGHT_SIZE * cascadeRatio;
     float blockerSum = 0;
     int numBlockers = 0;
  
-    for (int i = 0; i < shadowData.NumSamples; ++i)
+    for (int i = 0; i < g_ShadowData.NumSamples; ++i)
     {
         float2 offset = g_SampleOffsets[i] * searchWidth;
-        float shadowMapDepth = cascadeShadowMap.SampleLevel(pointSampler, float3(uv + offset, cascadeIndex), 0).r;
+        float shadowMapDepth = cascadeShadowMap.SampleLevel(g_SamplerPointClamp, float3(uv + offset, cascadeIndex), 0).r;
         if (shadowMapDepth < depth)
         {
             blockerSum += shadowMapDepth;
@@ -83,31 +83,29 @@ float FindBlocker(Texture2DArray cascadeShadowMap, int cascadeIndex, SamplerStat
     return blockerSum / numBlockers;
 }
 
-float PCF(Texture2DArray cascadeShadowMap, int cascadeIndex, SamplerComparisonState shadowSampler, 
-            float2 uv, float depth, float filterRadius, int sampleCount)
+float PCF(Texture2DArray cascadeShadowMap, int cascadeIndex, float2 uv, float depth, float filterRadius, int sampleCount)
 {
     float shadowFactor = 0.0f;
     for (int i = 0; i < sampleCount; i++)
     {
         float2 offset = g_SampleOffsets[i] * filterRadius;
-        shadowFactor += cascadeShadowMap.SampleCmpLevelZero(shadowSampler, float3(uv + offset, cascadeIndex), depth).r;
+        shadowFactor += cascadeShadowMap.SampleCmpLevelZero(g_SamplerShadow, float3(uv + offset, cascadeIndex), depth).r;
     }
     return shadowFactor / sampleCount;
 }
 
-// See https://developer.download.nvidia.com/whitepapers/2008/PCSS_Integration.pdf
-float PCSS(Texture2DArray cascadeShadowMap, int cascadeIndex, SamplerComparisonState shadowSampler, 
-            SamplerState pointSampler, float3 positionV, ShadowData shadowData, float4x4 invView)
+// see https://developer.download.nvidia.com/whitepapers/2008/PCSS_Integration.pdf
+float PCSS(Texture2DArray cascadeShadowMap, int cascadeIndex, float3 positionV)
 {
-    if (shadowData.UseVogelDiskSample)
-        VogelDiskSamples(positionV.xy, shadowData.NumSamples);
+    if (g_ShadowData.UseVogelDiskSample)
+        VogelDiskSamples(positionV.xy, g_ShadowData.NumSamples);
     else
-        PoissonDiskSamples(positionV.xy, shadowData.NumSamples);
+        PoissonDiskSamples(positionV.xy, g_ShadowData.NumSamples);
     
     float shadowFactor = 1.0f;
     
-    float4 positionW = mul(float4(positionV, 1.0f), invView);
-    float4 positionH = mul(positionW, shadowData.LightViewProj[cascadeIndex]);
+    float4 positionW = mul(float4(positionV, 1.0f), g_InvView);
+    float4 positionH = mul(positionW, g_ShadowData.LightViewProj[cascadeIndex]);
     positionH.xyz /= positionH.w;
     
     float depth = positionH.z;
@@ -117,32 +115,30 @@ float PCSS(Texture2DArray cascadeShadowMap, int cascadeIndex, SamplerComparisonS
     float2 shadowMapUV = (positionH.xy + 1.0f) * 0.5f;
     shadowMapUV.y = 1.0f - shadowMapUV.y;
    
-    float avgBlockerDepth = FindBlocker(cascadeShadowMap, cascadeIndex, pointSampler, 
-                                        shadowMapUV, depth, shadowData);
+    float avgBlockerDepth = FindBlocker(cascadeShadowMap, cascadeIndex, shadowMapUV, depth);
 
     if (avgBlockerDepth > 0)
     {
         float penumbraRatio = (depth - avgBlockerDepth) / avgBlockerDepth;
-        float filterRadius = max(penumbraRatio * shadowData.ShadowSoftness * LIGHT_SIZE, MIN_FILTER_RADIUS);
-            
-        shadowFactor = PCF(cascadeShadowMap, cascadeIndex, shadowSampler, shadowMapUV, depth, filterRadius, shadowData.NumSamples);
+        float filterRadius = max(penumbraRatio * g_ShadowData.ShadowSoftness * LIGHT_SIZE, MIN_FILTER_RADIUS);
+        
+        shadowFactor = PCF(cascadeShadowMap, cascadeIndex, shadowMapUV, depth, filterRadius, g_ShadowData.NumSamples);
     }
     
     return shadowFactor;
 }
     
-float2 CascadeShadowWithPCSS(Texture2DArray cascadeShadowMap, SamplerComparisonState shadowSampler, SamplerState pointSampler, 
-                            float3 positionV, ShadowData shadowData, float4x4 invView)
+float2 CascadeShadowWithPCSS(Texture2DArray cascadeShadowMap, float3 positionV)
 {
     float ends[] = {
-        shadowData.CascadeEnds[0].x,
-        shadowData.CascadeEnds[0].y,
-        shadowData.CascadeEnds[0].z,
-        shadowData.CascadeEnds[0].w,
-        shadowData.CascadeEnds[1].x,
-        shadowData.CascadeEnds[1].y,
-        shadowData.CascadeEnds[1].z,
-        shadowData.CascadeEnds[1].w,
+        g_ShadowData.CascadeEnds[0].x,
+        g_ShadowData.CascadeEnds[0].y,
+        g_ShadowData.CascadeEnds[0].z,
+        g_ShadowData.CascadeEnds[0].w,
+        g_ShadowData.CascadeEnds[1].x,
+        g_ShadowData.CascadeEnds[1].y,
+        g_ShadowData.CascadeEnds[1].z,
+        g_ShadowData.CascadeEnds[1].w,
     };
 
     int cascadeIndex = -1;
@@ -153,8 +149,7 @@ float2 CascadeShadowWithPCSS(Texture2DArray cascadeShadowMap, SamplerComparisonS
     float shadowFactor = 1.0f;
     if (cascadeIndex != -1)
     {
-        shadowFactor = PCSS(cascadeShadowMap, cascadeIndex, shadowSampler, pointSampler, 
-                            positionV, shadowData, invView);
+        shadowFactor = PCSS(cascadeShadowMap, cascadeIndex, positionV);
         
         // current depth value within the transition range,
         // blend between current and the next cascade
@@ -164,13 +159,12 @@ float2 CascadeShadowWithPCSS(Texture2DArray cascadeShadowMap, SamplerComparisonS
             float currentCascadeFar = ends[cascadeIndex + 1];
             float currentCascadeLength = currentCascadeFar - currentCascadeNear;
             
-            float transitionLength = currentCascadeLength * shadowData.TransitionRatio;
+            float transitionLength = currentCascadeLength * g_ShadowData.TransitionRatio;
             float transitionStart = currentCascadeFar - transitionLength;
             
             if (positionV.z >= transitionStart)
             {
-                float nextCascadeShadowFactor = PCSS(cascadeShadowMap, cascadeIndex + 1, shadowSampler, pointSampler, 
-                                                     positionV, shadowData, invView);
+                float nextCascadeShadowFactor = PCSS(cascadeShadowMap, cascadeIndex + 1, positionV);
                 float transitionFactor = saturate((positionV.z - transitionStart) / (currentCascadeFar - transitionStart));
                 shadowFactor = lerp(shadowFactor, nextCascadeShadowFactor, transitionFactor);
             }

@@ -517,9 +517,10 @@ void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
 		m_GBufferMetalness.Srv.Index,
 		m_GBufferRoughness.Srv.Index,
 		m_GBufferAmbient.Srv.Index,
-		m_DxContext->DepthStencilBuffer().Srv.Index};
+		m_DxContext->DepthStencilBuffer().Srv.Index,
+		m_CascadedShadowMap->Srv(4).Index};
 
-	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 6,
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 7,
 											   reinterpret_cast<void *>(&resources), 0);
 
 	// fullscreen triangle

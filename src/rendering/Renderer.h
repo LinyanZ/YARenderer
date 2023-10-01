@@ -64,6 +64,7 @@ struct DeferredLightingRenderResources
 	UINT RoughnessTexIndex;
 	UINT AmbientTexIndex;
 	UINT DepthTexIndex;
+	UINT ShadowMapTexIndex;
 };
 
 struct Renderer

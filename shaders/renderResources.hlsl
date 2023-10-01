@@ -19,6 +19,7 @@ struct DeferredLightingRenderResources
 	uint RoughnessTexIndex;
 	uint AmbientTexIndex;
 	uint DepthTexIndex;
+	uint ShadowMapTexIndex;
 };
 
 #endif // __RENDER_RESOURCES_HLSL__
