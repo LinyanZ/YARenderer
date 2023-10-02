@@ -1,7 +1,7 @@
 #ifndef __LIGHTING_UTILS_HLSL__
 #define __LIGHTING_UTILS_HLSL__
 
-#include "common.hlsl"
+#include "constants.hlsl"
 #include "utils.hlsl"
 #include "structs.hlsl"
 

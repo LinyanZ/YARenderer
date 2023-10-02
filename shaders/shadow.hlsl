@@ -1,8 +1,12 @@
-#include "common.hlsl"
-#include "renderResources.hlsl"
+#include "constants.hlsl"
 #include "constantBuffers.hlsl"
 
-ConstantBuffer<ShadowRenderResources> g_Resources : register(b6);
+struct Resources
+{
+    uint CascadeIndex;
+};
+
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 struct VertexIn
 {

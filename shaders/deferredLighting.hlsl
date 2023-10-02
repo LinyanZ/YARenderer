@@ -1,10 +1,20 @@
-#include "renderResources.hlsl"
 #include "constantBuffers.hlsl"
 #include "lightingUtils.hlsl"
 #include "samplers.hlsl"
 #include "cascadedShadow.hlsl"
 
-ConstantBuffer<DeferredLightingRenderResources> g_Resources : register(b6);
+struct Resources
+{
+	uint AlbedoTexIndex;
+	uint NormalTexIndex;
+	uint MetalnessTexIndex;
+	uint RoughnessTexIndex;
+	uint AmbientTexIndex;
+	uint DepthTexIndex;
+	uint ShadowMapTexIndex;
+};
+
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 struct VertexOut
 {

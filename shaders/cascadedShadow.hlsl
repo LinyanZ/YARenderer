@@ -1,4 +1,4 @@
-#include "common.hlsl"
+#include "constants.hlsl"
 #include "structs.hlsl"
 #include "samplers.hlsl"
 

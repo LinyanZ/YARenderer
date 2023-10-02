@@ -1,4 +1,4 @@
-#include "common.hlsl"
+#include "constants.hlsl"
 #include "lightingUtils.hlsl"
 
 cbuffer cbPerObject : register(b0)

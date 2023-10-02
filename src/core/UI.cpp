@@ -108,10 +108,10 @@ void UI::Render()
 
         if (ImGui::TreeNodeEx("VXGI", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Checkbox("Enable GI", &g_RenderingSettings.EnableGI);
-            ImGui::Checkbox("Dynamic Update", &g_RenderingSettings.DynamicUpdate);
-            ImGui::Checkbox("Debug Voxel", &g_RenderingSettings.DebugVoxel);
-            ImGui::SliderInt("Debug Voxel Mip Level", &g_RenderingSettings.DebugVoxelMipLevel, 0, 7);
+            ImGui::Checkbox("Enable GI", &g_RenderingSettings.GI.Enable);
+            ImGui::Checkbox("Dynamic Update", &g_RenderingSettings.GI.DynamicUpdate);
+            ImGui::Checkbox("Debug Voxel", &g_RenderingSettings.GI.DebugVoxel);
+            ImGui::SliderInt("Debug Voxel Mip Level", &g_RenderingSettings.GI.DebugVoxelMipLevel, 0, 7);
 
             ImGui::TreePop();
         }

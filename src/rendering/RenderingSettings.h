@@ -7,6 +7,14 @@ enum class Antialising
 	TAA
 };
 
+struct VXGISettings
+{
+	bool Enable = true;
+	bool DynamicUpdate = true;
+	bool DebugVoxel = false;
+	int DebugVoxelMipLevel = 0;
+};
+
 struct RenderingSettings
 {
 	// Display Settings
@@ -27,11 +35,7 @@ struct RenderingSettings
 	bool EnableMotionBlur = true;
 	float MotionBlurAmount = 0.25;
 
-	// VXGI
-	bool EnableGI = true;
-	bool DebugVoxel = false;
-	bool DynamicUpdate = true;
-	int DebugVoxelMipLevel = 0;
+	VXGISettings GI;
 
 	// Sun Light
 	float SunTheta = 240;

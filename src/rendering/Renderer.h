@@ -12,7 +12,6 @@
 #include "FrameResource.h"
 #include "PipelineStateManager.h"
 #include "Camera.h"
-#include "SSAO.h"
 #include "postProcessing/PostProcessing.h"
 #include "Material.h"
 #include "Light.h"
@@ -21,18 +20,12 @@
 #include "EnvironmentMap.h"
 #include "RenderingUtils.h"
 #include "PipelineStates.h"
+#include "SSAO.h"
 #include "TAA.h"
-
-#include "vxgi/VolumeTexture.h"
+#include "VXGI.h"
 
 #define SPONZA_SCENE 0
 #define TEST_SCENE (!SPONZA_SCENE)
-
-#define FORWARD_RENDERING 1
-#define DEFERRED_RENDERING 0
-#define FORWARD_PLUS_RENDERING 0
-
-#define VOXEL_DIMENSION 128
 
 struct RenderItem
 {
@@ -44,27 +37,6 @@ struct RenderItem
 
 	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	Ref<Mesh> Mesh;
-};
-
-struct SkyBoxRenderResources
-{
-	UINT EnvMapTexIndex;
-};
-
-struct ShadowRenderResources
-{
-	UINT CascadeIndex;
-};
-
-struct DeferredLightingRenderResources
-{
-	UINT AlbedoTexIndex;
-	UINT NormalTexIndex;
-	UINT MetalnessTexIndex;
-	UINT RoughnessTexIndex;
-	UINT AmbientTexIndex;
-	UINT DepthTexIndex;
-	UINT ShadowMapTexIndex;
 };
 
 struct Renderer
@@ -122,11 +94,8 @@ private:
 	void DrawRenderItems(GraphicsCommandList commandList, bool transparent = false);
 	void DrawSkybox(GraphicsCommandList commandList);
 
-	void ClearVoxel(GraphicsCommandList commandList);
 	void VoxelizeScene(GraphicsCommandList commandList);
 	void DebugVoxel(GraphicsCommandList commandList);
-	void BufferToTexture3D(GraphicsCommandList commandList);
-	void GenVoxelMipmap(GraphicsCommandList commandList);
 
 	void Debug(GraphicsCommandList commandList, Descriptor srv, int slot = 0);
 
@@ -158,6 +127,7 @@ private:
 	std::unique_ptr<EnvironmentMap> m_EnvironmentMap;
 	std::unique_ptr<TAA> m_TAA;
 	std::unique_ptr<PostProcessing> m_PostProcessing;
+	std::unique_ptr<VXGI> m_VXGI;
 
 	std::vector<Light> m_Lights;
 
@@ -174,11 +144,4 @@ private:
 	float m_PreviousJitterY = 0;
 
 	bool m_FirstFrame = true;
-
-	// VXGI
-	VolumeTexture m_VolumeAlbedo;
-	bool temp = false;
-
-	Resource m_Voxels = nullptr;
-	Descriptor m_VoxelsUAV;
 };

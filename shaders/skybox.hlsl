@@ -1,8 +1,12 @@
-#include "renderResources.hlsl"
 #include "samplers.hlsl"
 #include "constantBuffers.hlsl"
 
-ConstantBuffer<SkyBoxRenderResources> g_Resources : register(b6);
+struct Resources
+{
+    uint EnvMapTexIndex;
+};
+
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 struct VertexIn
 {

@@ -1,4 +1,4 @@
-#include "common.hlsl"
+#include "constants.hlsl"
 
 cbuffer cbPerObject : register(b0)
 {

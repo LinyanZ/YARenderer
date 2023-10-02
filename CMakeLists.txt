@@ -87,7 +87,8 @@ set(SRC_FILES
     src/rendering/TAA.h
     src/rendering/TAA.cpp
 
-    src/rendering/vxgi/VolumeTexture.h
+    src/rendering/VXGI.h
+    src/rendering/VXGI.cpp
 
     src/rendering/postProcessing/FXAA.h
     src/rendering/postProcessing/FXAA.cpp

@@ -1,15 +1,9 @@
 #include "pch.h"
 #include "Renderer.h"
 #include "RenderingSettings.h"
-
-constexpr auto PI = 3.1415926;
+#include "core/MathHelper.h"
 
 extern RenderingSettings g_RenderingSettings;
-
-struct Voxel
-{
-	UINT64 Radiance;
-};
 
 Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 	: m_DxContext(dxContext), m_Width(width), m_Height(height)
@@ -22,12 +16,16 @@ Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 	for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; ++i)
 		m_FrameResources.push_back(std::make_unique<FrameResource>(dxContext->GetDevice(), passCount, objectCount, materialCount, lightCount));
 
+	RenderingUtils::Init(dxContext);
+	PipelineStates::Init(dxContext->GetDevice());
+
 	m_PipelineStateManager = std::make_unique<PipelineStateManager>(dxContext->GetDevice());
 	m_EnvironmentMap = std::make_unique<EnvironmentMap>(dxContext);
 	m_CascadedShadowMap = std::make_unique<CascadedShadowMap>(dxContext);
 	m_PostProcessing = std::make_unique<PostProcessing>(dxContext, width, height);
 	m_SSAO = std::make_unique<SSAO>(dxContext, width, height);
 	m_TAA = std::make_unique<TAA>(dxContext, width, height);
+	m_VXGI = std::make_unique<VXGI>(dxContext, VOXEL_DIMENSION);
 
 	BuildResources();
 	AllocateDescriptors();
@@ -36,33 +34,6 @@ Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 	m_ScreenViewport = {0, 0, (float)width, float(height), 0.0f, 1.0f};
 	m_ScissorRect = {0, 0, (long)width, (long)height};
 	m_Camera.SetLens(0.25f * MathHelper::Pi, (float)width / height, 1.0f, 1000.0f);
-
-	RenderingUtils::Init(dxContext);
-	PipelineStates::Init(dxContext->GetDevice());
-
-	m_VolumeAlbedo.Init(dxContext, VOXEL_DIMENSION);
-
-	// vxgi stuff
-	UINT byteSize = pow(VOXEL_DIMENSION, 3) * sizeof(Voxel);
-	ThrowIfFailed(dxContext->GetDevice()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
-		D3D12_RESOURCE_STATE_COMMON,
-		nullptr,
-		IID_PPV_ARGS(&m_Voxels)));
-
-	D3D12_UNORDERED_ACCESS_VIEW_DESC voxelUavDesc{};
-	voxelUavDesc.Format = DXGI_FORMAT_UNKNOWN;
-	voxelUavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-	voxelUavDesc.Buffer.FirstElement = 0;
-	voxelUavDesc.Buffer.NumElements = pow(VOXEL_DIMENSION, 3);
-	voxelUavDesc.Buffer.StructureByteStride = sizeof(Voxel);
-	voxelUavDesc.Buffer.CounterOffsetInBytes = 0;
-	voxelUavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-
-	m_VoxelsUAV = dxContext->GetCbvSrvUavHeap().Alloc();
-	dxContext->GetDevice()->CreateUnorderedAccessView(m_Voxels.Get(), nullptr, &voxelUavDesc, m_VoxelsUAV.CPUHandle);
 }
 
 void Renderer::BuildResources()
@@ -157,9 +128,6 @@ void Renderer::Render()
 	ID3D12DescriptorHeap *descriptorHeaps[] = {m_DxContext->GetCbvSrvUavHeap().Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
-	commandList->SetComputeRootSignature(PipelineStates::GetRootSignature());
-	ClearVoxel(commandList);
-
 	commandList->SetGraphicsRootSignature(PipelineStates::GetRootSignature());
 
 	// set pass constant buffer
@@ -177,13 +145,13 @@ void Renderer::Render()
 	// cascaded shadow from directional light
 	ShadowMapPass(commandList);
 
-	VoxelizeScene(commandList);
+	if (g_RenderingSettings.GI.DynamicUpdate)
+	{
+		commandList->SetComputeRootSignature(PipelineStates::GetRootSignature());
+		VoxelizeScene(commandList);
+	}
 
-	// write the voxel radiance data from RWStructuredBuffer to Texture3D
-	BufferToTexture3D(commandList);
-	GenVoxelMipmap(commandList);
-
-	if (g_RenderingSettings.DebugVoxel)
+	if (g_RenderingSettings.GI.DebugVoxel)
 	{
 		DebugVoxel(commandList);
 
@@ -225,7 +193,7 @@ void Renderer::EndFrame()
 	CurrFrameResource()->Fence = m_DxContext->ExecuteCommandList();
 	m_DxContext->Present(g_RenderingSettings.EnableVSync);
 
-	if (!g_RenderingSettings.DebugVoxel)
+	if (!g_RenderingSettings.GI.DebugVoxel)
 		m_FirstFrame = false;
 }
 
@@ -235,8 +203,8 @@ void Renderer::EndFrame()
 
 XMFLOAT4 CalcSunDir(float thetaDeg, float phiDeg)
 {
-	float thetaRad = thetaDeg * PI / 180.0;
-	float phiRad = phiDeg * PI / 180.0;
+	float thetaRad = thetaDeg * MathHelper::Pi / 180.0;
+	float phiRad = phiDeg * MathHelper::Pi / 180.0;
 
 	float x = sin(phiRad) * cos(thetaRad);
 	float z = sin(phiRad) * sin(thetaRad);
@@ -321,56 +289,56 @@ void Renderer::BuildRenderItems()
 
 void Renderer::ForwardRendering(GraphicsCommandList commandList)
 {
-	commandList->RSSetViewports(1, &m_ScreenViewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
+	// commandList->RSSetViewports(1, &m_ScreenViewport);
+	// commandList->RSSetScissorRects(1, &m_ScissorRect);
 
-	DrawNormalsAndDepth(commandList);
-	m_SSAO->ComputeSSAO(commandList.Get(), m_GBufferNormal, m_DxContext->DepthStencilBuffer().Srv, CurrFrameResource(), 3);
+	// DrawNormalsAndDepth(commandList);
+	// m_SSAO->ComputeSSAO(commandList.Get(), m_GBufferNormal, m_DxContext->DepthStencilBuffer().Srv, CurrFrameResource(), 3);
 
-	// SSAO is rendered at half of the render target size, so reset to fullscreen size.
-	commandList->RSSetViewports(1, &m_ScreenViewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
+	// // SSAO is rendered at half of the render target size, so reset to fullscreen size.
+	// commandList->RSSetViewports(1, &m_ScreenViewport);
+	// commandList->RSSetScissorRects(1, &m_ScissorRect);
 
-	// Clear the background
-	// commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
-	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	// // Clear the background
+	// // commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
+	// commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
-	// Specify the buffers we are going to render to.
-	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
+	// // Specify the buffers we are going to render to.
+	// commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 
-	// Set the root signature for forward rendering
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("forwardRendering").Get());
+	// // Set the root signature for forward rendering
+	// commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("forwardRendering").Get());
 
-	// Bind pass constant buffer
-	auto passCB = CurrFrameResource()->PassCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+	// // Bind pass constant buffer
+	// auto passCB = CurrFrameResource()->PassCB->GetResource();
+	// commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-	// Bind IBL textures
-	commandList->SetGraphicsRootDescriptorTable(7, m_EnvironmentMap->GetIrMap().Srv.GPUHandle);
+	// // Bind IBL textures
+	// commandList->SetGraphicsRootDescriptorTable(7, m_EnvironmentMap->GetIrMap().Srv.GPUHandle);
 
-	// Bind SSAO map
-	commandList->SetGraphicsRootDescriptorTable(8, m_SSAO->AmbientMap().Srv.GPUHandle);
+	// // Bind SSAO map
+	// commandList->SetGraphicsRootDescriptorTable(8, m_SSAO->AmbientMap().Srv.GPUHandle);
 
-	// Bind Shadow map
-	commandList->SetGraphicsRootDescriptorTable(9, m_CascadedShadowMap->Srv(4).GPUHandle);
+	// // Bind Shadow map
+	// commandList->SetGraphicsRootDescriptorTable(9, m_CascadedShadowMap->Srv(4).GPUHandle);
 
-	// Bind lighting data
-	auto lightingDataBuffer = CurrFrameResource()->LightBuffer->GetResource();
-	commandList->SetGraphicsRootShaderResourceView(10, lightingDataBuffer->GetGPUVirtualAddress());
+	// // Bind lighting data
+	// auto lightingDataBuffer = CurrFrameResource()->LightBuffer->GetResource();
+	// commandList->SetGraphicsRootShaderResourceView(10, lightingDataBuffer->GetGPUVirtualAddress());
 
-	// Bind cascade shadow constant buffer
-	auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(11, shadowCB->GetGPUVirtualAddress());
+	// // Bind cascade shadow constant buffer
+	// auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
+	// commandList->SetGraphicsRootConstantBufferView(11, shadowCB->GetGPUVirtualAddress());
 
-	commandList->SetGraphicsRootDescriptorTable(12, m_VolumeAlbedo.Srv.GPUHandle);
+	// commandList->SetGraphicsRootDescriptorTable(12, m_VolumeAlbedo.Srv.GPUHandle);
 
-	// Draw Opague Objects
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRendering").Get());
-	DrawRenderItems(commandList, false);
+	// // Draw Opague Objects
+	// commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRendering").Get());
+	// DrawRenderItems(commandList, false);
 
-	// Draw transparent objects
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRenderingTransparent").Get());
-	DrawRenderItems(commandList, true);
+	// // Draw transparent objects
+	// commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRenderingTransparent").Get());
+	// DrawRenderItems(commandList, true);
 }
 
 void Renderer::DeferredRendering(GraphicsCommandList commandList)
@@ -530,17 +498,15 @@ void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
 {
 	commandList->SetPipelineState(PipelineStates::GetPSO("deferredLighting"));
 
-	DeferredLightingRenderResources resources{
-		m_GBufferAlbedo.Srv.Index,
-		m_GBufferNormal.Srv.Index,
-		m_GBufferMetalness.Srv.Index,
-		m_GBufferRoughness.Srv.Index,
-		m_GBufferAmbient.Srv.Index,
-		m_DxContext->DepthStencilBuffer().Srv.Index,
-		m_CascadedShadowMap->Srv(4).Index};
+	UINT resources[] = {m_GBufferAlbedo.Srv.Index,
+						m_GBufferNormal.Srv.Index,
+						m_GBufferMetalness.Srv.Index,
+						m_GBufferRoughness.Srv.Index,
+						m_GBufferAmbient.Srv.Index,
+						m_DxContext->DepthStencilBuffer().Srv.Index,
+						m_CascadedShadowMap->Srv(4).Index};
 
-	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 7,
-											   reinterpret_cast<void *>(&resources), 0);
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
 
 	// fullscreen triangle
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -618,9 +584,7 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 	for (UINT i = 0; i < NUM_CASCADES; i++)
 	{
 		// Bind cascade shadow index
-		ShadowRenderResources resources{i};
-		commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1,
-												   reinterpret_cast<void *>(&resources), 0);
+		commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1, &i, 0);
 
 		commandList->ClearDepthStencilView(m_CascadedShadowMap->Dsv(i).CPUHandle,
 										   D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
@@ -635,11 +599,9 @@ void Renderer::ShadowMapPass(GraphicsCommandList commandList)
 
 void Renderer::DrawSkybox(GraphicsCommandList commandList)
 {
-	SkyBoxRenderResources resources{m_EnvironmentMap->GetEnvMap().Srv.Index};
-
 	commandList->SetPipelineState(PipelineStates::GetPSO("skybox"));
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, 1,
-											   reinterpret_cast<void *>(&resources), 0);
+											   &m_EnvironmentMap->GetEnvMap().Srv.Index, 0);
 
 	commandList->IASetVertexBuffers(0, 1, &m_Skybox->VertexBufferView());
 	commandList->IASetIndexBuffer(&m_Skybox->IndexBufferView());
@@ -648,27 +610,22 @@ void Renderer::DrawSkybox(GraphicsCommandList commandList)
 	commandList->DrawIndexedInstanced(m_Skybox->SubMeshes()[0].IndexCount, 1, 0, 0, 0);
 }
 
-void Renderer::ClearVoxel(GraphicsCommandList commandList)
-{
-	commandList->SetPipelineState(PipelineStates::GetPSO("clearVoxel"));
-	commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, 1, &m_VoxelsUAV.Index, 0);
-
-	UINT groupSize = VOXEL_DIMENSION / 8;
-	commandList->Dispatch(groupSize, groupSize, groupSize);
-}
-
 void Renderer::VoxelizeScene(GraphicsCommandList commandList)
 {
 	commandList->OMSetRenderTargets(0, nullptr, false, nullptr);
-	commandList->RSSetScissorRects(1, &m_VolumeAlbedo.ScissorRect);
-	commandList->RSSetViewports(1, &m_VolumeAlbedo.ViewPort);
+
+	commandList->RSSetViewports(1, &m_VXGI->GetViewPort());
+	commandList->RSSetScissorRects(1, &m_VXGI->GetScissorRect());
 
 	commandList->SetPipelineState(PipelineStates::GetPSO("voxelize"));
 
-	UINT resources[] = {m_VoxelsUAV.Index, m_CascadedShadowMap->Srv(4).Index};
+	UINT resources[] = {m_VXGI->GetVoxelBufferUav().Index, m_CascadedShadowMap->Srv(4).Index};
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
 
 	DrawRenderItems(commandList, false);
+
+	m_VXGI->BufferToTexture3D(commandList);
+	m_VXGI->GenVoxelMipmap(commandList);
 }
 
 void Renderer::DebugVoxel(GraphicsCommandList commandList)
@@ -682,41 +639,13 @@ void Renderer::DebugVoxel(GraphicsCommandList commandList)
 	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 	commandList->SetPipelineState(PipelineStates::GetPSO("voxelDebug"));
 
-	UINT resources[] = {m_VolumeAlbedo.Srv.Index, static_cast<UINT>(g_RenderingSettings.DebugVoxelMipLevel)};
+	UINT resources[] = {m_VXGI->GetTextureSrv().Index, static_cast<UINT>(g_RenderingSettings.GI.DebugVoxelMipLevel)};
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
 
-	UINT dimension = VOXEL_DIMENSION / pow(2, g_RenderingSettings.DebugVoxelMipLevel);
+	UINT dimension = VOXEL_DIMENSION / pow(2, g_RenderingSettings.GI.DebugVoxelMipLevel);
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
 	commandList->DrawInstanced(pow(dimension, 3), 1, 0, 0);
-}
-
-void Renderer::BufferToTexture3D(GraphicsCommandList commandList)
-{
-	UINT resources[2] = {m_VoxelsUAV.Index,
-						 m_VolumeAlbedo.Uav[0].Index};
-
-	commandList->SetPipelineState(PipelineStates::GetPSO("voxelBuffer2Tex"));
-	commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, 2, resources, 0);
-
-	UINT groupSize = std::max(VOXEL_DIMENSION / 8, 1);
-	commandList->Dispatch(groupSize, groupSize, groupSize);
-}
-
-void Renderer::GenVoxelMipmap(GraphicsCommandList commandList)
-{
-	UINT mipLevels = m_VolumeAlbedo.GetMipLevels();
-
-	commandList->SetPipelineState(PipelineStates::GetPSO("voxelMipmap"));
-
-	for (int i = 1, levelWidth = VOXEL_DIMENSION / 2; i < mipLevels; i++, levelWidth /= 2)
-	{
-		UINT resources[] = {m_VolumeAlbedo.Uav[i - 1].Index, m_VolumeAlbedo.Uav[i].Index};
-		commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, 2, resources, 0);
-
-		UINT count = std::max(levelWidth / 8, 1);
-		commandList->Dispatch(count, count, count);
-	}
 }
 
 void Renderer::Debug(GraphicsCommandList commandList, Descriptor srv, int slot)
@@ -870,7 +799,7 @@ void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 	m_MainPassCB.TotalTime = timer.TotalTime();
 	m_MainPassCB.DeltaTime = timer.DeltaTime();
 	m_MainPassCB.Jitter = XMFLOAT2(jitterX, jitterY);
-	m_MainPassCB.EnableGI = g_RenderingSettings.EnableGI;
+	m_MainPassCB.EnableGI = g_RenderingSettings.GI.Enable;
 
 	if (!m_FirstFrame)
 	{

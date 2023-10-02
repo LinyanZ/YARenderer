@@ -1,7 +1,7 @@
 #ifndef __UTILS_HLSL__
 #define __UTILS_HLSL__
 
-#include "common.hlsl"
+#include "constants.hlsl"
 
 // Compute Van der Corput radical inverse
 // See: http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html

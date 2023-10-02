@@ -1,19 +1,17 @@
 #include "structs.hlsl"
-#include "common.hlsl"
-#include "renderResources.hlsl"
+#include "constants.hlsl"
+#include "voxelUtils.hlsl"
 
-ConstantBuffer<VoxelRenderResources> g_Resources : register(b6);
-
-uint Flatten(uint3 texCoord)
+struct Resources
 {
-    return texCoord.x * VOXEL_DIMENSION * VOXEL_DIMENSION + 
-           texCoord.y * VOXEL_DIMENSION + 
-           texCoord.z;
-}
+    uint VoxelIndex;
+};
+
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 [numthreads(8,8,8)]
 void main(uint3 ThreadID : SV_DispatchThreadID)
 {
     RWStructuredBuffer<Voxel> voxels = ResourceDescriptorHeap[g_Resources.VoxelIndex];
-    voxels[Flatten(ThreadID)].Radiance = 0;
+    voxels[Flatten(ThreadID, VOXEL_DIMENSION)].Radiance = 0;
 }

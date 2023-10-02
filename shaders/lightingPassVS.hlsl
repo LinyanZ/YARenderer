@@ -1,4 +1,4 @@
-#include "common.hlsl"
+#include "constants.hlsl"
 
 cbuffer cbLightIndex : register(b0)
 {

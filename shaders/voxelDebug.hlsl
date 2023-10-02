@@ -1,6 +1,7 @@
-#include "common.hlsl"
+#include "constants.hlsl"
 #include "cube.hlsl"
 #include "constantBuffers.hlsl"
+#include "voxelUtils.hlsl"
 
 struct Resources
 {
@@ -19,27 +20,6 @@ struct GeometryOut
 uint VS(uint vertexID : SV_VertexID) : VERTEX_ID
 {
     return vertexID;
-}
-
-uint3 Unflatten(uint i, uint dim)
-{
-    uint3 coord;
-    
-    coord[0] = i % dim;
-    i /= dim;
-    
-    coord[1] = i % dim;
-    i /= dim;
-    
-    coord[2] = i % dim;
-    
-    return coord;
-}
-
-float4 convRGBA8ToVec4(uint val)
-{
-    float4 re = float4(float((val & 0x000000FF)), float((val & 0x0000FF00) >> 8U), float((val & 0x00FF0000) >> 16U), float((val & 0xFF000000) >> 24U));
-    return clamp(re, float4(0.0, 0.0, 0.0, 0.0), float4(255.0, 255.0, 255.0, 255.0));
 }
 
 [maxvertexcount(36)]
@@ -84,6 +64,5 @@ void GS(point uint input[1] : VERTEX_ID,
 
 float4 PS(GeometryOut pin) : SV_Target
 {
-    // return float4(1,1,1,1);
     return pin.color;
 }

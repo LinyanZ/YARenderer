@@ -1,9 +1,10 @@
-#include "samplers.hlsl"
-#include "constantBuffers.hlsl"
+#include "constants.hlsl"
 #include "structs.hlsl"
+#include "constantBuffers.hlsl"
+#include "samplers.hlsl"
 #include "common.hlsl"
-#include "renderResources.hlsl"
 #include "cascadedShadow.hlsl"
+#include "voxelUtils.hlsl"
 
 struct Resources
 {
@@ -189,143 +190,6 @@ void GS(triangle GeometryInOut input[3], inout TriangleStream<GeometryInOut> tri
     }
 }
 
-// ref: file:///C:/Users/LINYAN-DESKTOP/Desktop/OpenGLInsights.pdf Chapter 22
-uint convVec4ToRGBA8(float4 val)
-{
-    return (uint(val.w) & 0x000000FF) << 24U | (uint(val.z) & 0x000000FF) << 16U | (uint(val.y) & 0x000000FF) << 8U | (uint(val.x) & 0x000000FF);
-}
-
-float4 convRGBA8ToVec4(uint val)
-{
-    float4 re = float4(float((val & 0x000000FF)), float((val & 0x0000FF00) >> 8U), float((val & 0x00FF0000) >> 16U), float((val & 0xFF000000) >> 24U));
-    return clamp(re, float4(0.0, 0.0, 0.0, 0.0), float4(255.0, 255.0, 255.0, 255.0));
-}
-
-void ImageAtomicRGBA8Avg(RWTexture3D<uint> image, uint3 coord, float4 val)
-{
-    val.rgb *= 255.0f;
-    uint newVal = convVec4ToRGBA8(val);
-    
-    uint prevStoredVal = 0;
-    uint curStoredVal;
-    
-    InterlockedCompareExchange(image[coord], prevStoredVal, newVal, curStoredVal);
-    while (curStoredVal != prevStoredVal)
-    {
-        prevStoredVal = curStoredVal;
-        float4 rval = convRGBA8ToVec4(curStoredVal);
-        rval.xyz *= rval.w;
-        
-        float4 curValF = rval + val;
-        curValF.xyz /= curValF.w;
-        
-        newVal = convVec4ToRGBA8(curValF);
-        InterlockedCompareExchange(image[coord], prevStoredVal, newVal, curStoredVal);
-    }
-}
-
-
-
-uint64_t ConvFloat4ToUINT64(float4 val)
-{
-    return (uint64_t(val.w) & 0x0000FFFF) << 48U | (uint64_t(val.z) & 0x0000FFFF) << 32U | (uint64_t(val.y) & 0x0000FFFF) << 16U | (uint64_t(val.x) & 0x0000FFFF);
-}
-
-float4 ConvUINT64ToFloat4(uint64_t val)
-{
-    float4 re = float4(float((val & 0x0000FFFF)), float((val & 0xFFFF0000) >> 16U), float((val & 0xFFFF00000000) >> 32U), float((val & 0xFFFF000000000000) >> 48U));
-    return clamp(re, float4(0.0, 0.0, 0.0, 0.0), float4(65535.0, 65535.0, 65535.0, 65535.0));
-}
-
-void ImageAtomicUINT64Avg(RWStructuredBuffer<Voxel> voxels, uint index, float4 val)
-{
-    val.rgb *= 65535.0f;
-    uint64_t newVal = ConvFloat4ToUINT64(val);
-    
-    uint64_t prevStoredVal = 0;
-    uint64_t curStoredVal;
-    
-    InterlockedCompareExchange(voxels[index].Radiance, prevStoredVal, newVal, curStoredVal);
-    while (curStoredVal != prevStoredVal)
-    {
-        prevStoredVal = curStoredVal;
-        float4 rval = ConvUINT64ToFloat4(curStoredVal);
-        rval.xyz *= rval.w;
-        
-        float4 curValF = rval + val;
-        curValF.xyz /= curValF.w;
-        
-        newVal = ConvFloat4ToUINT64(curValF);
-        InterlockedCompareExchange(voxels[index].Radiance, prevStoredVal, newVal, curStoredVal);
-    }
-}
-
-uint Flatten(uint3 texCoord)
-{
-    return texCoord.x * VOXEL_DIMENSION * VOXEL_DIMENSION + 
-           texCoord.y * VOXEL_DIMENSION + 
-           texCoord.z;
-}
-
-float4 GetAlbedo(float2 texCoord)
-{
-    float4 albedo = float4(g_Material.Albedo.rgb, 1.0);
-    if (g_Material.AlbedoTexIndex != -1)
-    {
-        Texture2D<float4> albedoTexture = ResourceDescriptorHeap[g_Material.AlbedoTexIndex];
-        albedo *= albedoTexture.Sample(g_SamplerAnisotropicWrap, texCoord);
-    }
-    return albedo;
-}
-
-
-float3 GetNormal(float3 normalV, float3 tangentV, float3 bitangentV, float2 texCoord)
-{
-    float3 normal;
-    if (g_Material.NormalTexIndex != -1)
-    {
-        float3x3 TBN = float3x3(normalize(tangentV),
-                                normalize(bitangentV),
-                                normalize(normalV));
-        
-        Texture2D<float4> normalTexture = ResourceDescriptorHeap[g_Material.NormalTexIndex];
-        float3 normalTex = normalTexture.Sample(g_SamplerAnisotropicWrap, texCoord).rgb;
-        
-        // Expand normal range from [0, 1] to [-1, 1].
-        normal = normalTex * 2.0 - 1.0;
-
-        // Transform normal from tangent space to view space.
-        normal = normalize(mul(normal, TBN));
-    }
-    else
-    {
-        normal = normalize(normalV);
-    }
-    return normal;
-}
-
-float GetMetalness(float2 texCoord)
-{
-    float metalness = g_Material.Metalness;
-    if (g_Material.MetalnessTexIndex != -1)
-    {
-        Texture2D<float4> metalnessTexture = ResourceDescriptorHeap[g_Material.MetalnessTexIndex];
-        metalness = metalnessTexture.Sample(g_SamplerAnisotropicWrap, texCoord).b;
-    }
-    return metalness;
-}
-
-float GetRoughness(float2 texCoord)
-{
-    float roughness = g_Material.Roughness;
-    if (g_Material.RoughnessTexIndex != -1)
-    {
-        Texture2D<float4> roughnessTexture = ResourceDescriptorHeap[g_Material.RoughnessTexIndex];
-        roughness = roughnessTexture.Sample(g_SamplerAnisotropicWrap, texCoord).g;
-    }
-    return roughness;
-}
-
 void PS(GeometryInOut pin)
 {
     RWStructuredBuffer<Voxel> voxels = ResourceDescriptorHeap[g_Resources.VoxelIndex];
@@ -411,7 +275,8 @@ void PS(GeometryInOut pin)
             }
         }
         
-        InterlockedAdd(voxels[Flatten(texIndex)].Radiance, ConvFloat4ToUINT64(float4(directLighting * 50.0, alpha * 255.0)));
+        uint voxelIndex = Flatten(texIndex, VOXEL_DIMENSION);
+        InterlockedAdd(voxels[voxelIndex].Radiance, ConvFloat4ToUINT64(float4(directLighting * 50.0, alpha * 255.0)));
         // ImageAtomicUINT64Avg(voxels, Flatten(texIndex), float4(directLighting, alpha));
     }
 }
