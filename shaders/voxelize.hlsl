@@ -1,59 +1,17 @@
+#include "samplers.hlsl"
+#include "constantBuffers.hlsl"
+#include "structs.hlsl"
 #include "common.hlsl"
+#include "renderResources.hlsl"
 #include "cascadedShadow.hlsl"
 
-cbuffer cbPerObject : register(b0)
+struct Resources
 {
-    float4x4 gWorld;
-    float4x4 gPrevWorld;
+    uint VoxelIndex;
+    uint ShadowMapTexIndex;
 };
 
-cbuffer cbPass : register(b1)
-{
-    float4x4 gView;
-    float4x4 gInvView;
-    float4x4 gProj;
-    float4x4 gInvProj;
-    float4x4 gViewProj;
-    float4x4 gPrevViewProj;
-    float4x4 gInvViewProj;
-    float4x4 gViewProjTex;
-    float3 gEyePosW;
-    float cbPerObjectPad1;
-    float2 gRenderTargetSize;
-    float2 gInvRenderTargetSize;
-    float gNearZ;
-    float gFarZ;
-    float gTotalTime;
-    float gDeltaTime;
-    float2 gJitter;
-    float2 gPreviousJitter;
-};
-
-cbuffer Material : register(b2)
-{
-    Material Mat;
-};
-
-cbuffer cbShadowPass : register(b3)
-{
-    ShadowData gShadowData;
-};
-
-Texture2D AlbedoTexture : register(t0);
-Texture2D NormalTexture : register(t1);
-Texture2D MetalnessTexture : register(t2);
-Texture2D RoughnessTexture : register(t3);
-Texture2DArray gShadowMap : register(t4);
-
-StructuredBuffer<Light> Lights : register(t5);
-
-RWTexture3D<uint> gVoxelizerAlbedo : register(u0);
-
-SamplerState defaultSampler : register(s0);
-SamplerState spBRDF_Sampler : register(s1);
-SamplerComparisonState gsamShadow : register(s2);
-SamplerState pointSampler : register(s3);
-
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 float3 DoDirectLighting(Light light, float3 albedo, float3 normal, float metalness, float roughness, float3 L, float3 V)
 {
@@ -137,6 +95,14 @@ float3 DoSpotLight(Light light, float3 albedo, float3 normal, float metalness, f
     return DoDirectLighting(light, albedo, normal, metalness, roughness, L, V) * attenuation * spotIntensity * light.Intensity;
 }
 
+struct VertexIn
+{
+    float3 Position     : POSITION;
+    float3 Normal       : NORMAL;
+    float3 Tangent      : TANGENT;
+    float3 Bitangent    : BITANGENT;
+    float2 TexCoord     : TEXCOORD0;
+};
 
 struct GeometryInOut
 {
@@ -155,14 +121,14 @@ GeometryInOut VS(VertexIn vin)
     GeometryInOut vout;
     vout.TexCoord = vin.TexCoord;
     
-    // Transform the position into world space as we will use 
+    // transform the position into world space as we will use 
     // this to index into the voxel grid and write to it
-    vout.PositionW = mul(float4(vin.Position, 1.0f), gWorld).xyz;
-    vout.NormalW = mul(vin.Normal, (float3x3) gWorld);
+    vout.PositionW = mul(float4(vin.Position, 1.0f), g_World).xyz;
+    vout.NormalW = mul(vin.Normal, (float3x3) g_World);
     
-    float4x4 ModelView = mul(gWorld, gView);
+    float4x4 ModelView = mul(g_World, g_View);
     
-    // Transform to view space.
+    // transform to view space
     vout.PositionV = mul(float4(vin.Position, 1.0), ModelView).rgb;
     vout.NormalV = mul(vin.Normal, (float3x3) ModelView);
     vout.TangentV = mul(vin.Tangent, (float3x3) ModelView);
@@ -258,27 +224,72 @@ void ImageAtomicRGBA8Avg(RWTexture3D<uint> image, uint3 coord, float4 val)
     }
 }
 
-void PS(GeometryInOut pin)
+
+
+uint64_t ConvFloat4ToUINT64(float4 val)
 {
-    // Albedo Color
-    float3 albedo = Mat.Albedo.xyz;
-    float alpha = Mat.Albedo.a;
-    if (Mat.HasAlbedoTexture)
-    {
-        float4 color = AlbedoTexture.Sample(defaultSampler, pin.TexCoord);
-        albedo *= color.rgb;
-        alpha *= color.a;
-    }
+    return (uint64_t(val.w) & 0x0000FFFF) << 48U | (uint64_t(val.z) & 0x0000FFFF) << 32U | (uint64_t(val.y) & 0x0000FFFF) << 16U | (uint64_t(val.x) & 0x0000FFFF);
+}
+
+float4 ConvUINT64ToFloat4(uint64_t val)
+{
+    float4 re = float4(float((val & 0x0000FFFF)), float((val & 0xFFFF0000) >> 16U), float((val & 0xFFFF00000000) >> 32U), float((val & 0xFFFF000000000000) >> 48U));
+    return clamp(re, float4(0.0, 0.0, 0.0, 0.0), float4(65535.0, 65535.0, 65535.0, 65535.0));
+}
+
+void ImageAtomicUINT64Avg(RWStructuredBuffer<Voxel> voxels, uint index, float4 val)
+{
+    val.rgb *= 65535.0f;
+    uint64_t newVal = ConvFloat4ToUINT64(val);
     
-    // Normal Mapping
-    float3 normal;
-    if (Mat.HasNormalTexture)
+    uint64_t prevStoredVal = 0;
+    uint64_t curStoredVal;
+    
+    InterlockedCompareExchange(voxels[index].Radiance, prevStoredVal, newVal, curStoredVal);
+    while (curStoredVal != prevStoredVal)
     {
-        float3x3 TBN = float3x3(normalize(pin.TangentV),
-                                normalize(pin.BitangentV),
-                                normalize(pin.NormalV));
+        prevStoredVal = curStoredVal;
+        float4 rval = ConvUINT64ToFloat4(curStoredVal);
+        rval.xyz *= rval.w;
         
-        float3 normalTex = NormalTexture.Sample(defaultSampler, pin.TexCoord).rgb;
+        float4 curValF = rval + val;
+        curValF.xyz /= curValF.w;
+        
+        newVal = ConvFloat4ToUINT64(curValF);
+        InterlockedCompareExchange(voxels[index].Radiance, prevStoredVal, newVal, curStoredVal);
+    }
+}
+
+uint Flatten(uint3 texCoord)
+{
+    return texCoord.x * VOXEL_DIMENSION * VOXEL_DIMENSION + 
+           texCoord.y * VOXEL_DIMENSION + 
+           texCoord.z;
+}
+
+float4 GetAlbedo(float2 texCoord)
+{
+    float4 albedo = float4(g_Material.Albedo.rgb, 1.0);
+    if (g_Material.AlbedoTexIndex != -1)
+    {
+        Texture2D<float4> albedoTexture = ResourceDescriptorHeap[g_Material.AlbedoTexIndex];
+        albedo *= albedoTexture.Sample(g_SamplerAnisotropicWrap, texCoord);
+    }
+    return albedo;
+}
+
+
+float3 GetNormal(float3 normalV, float3 tangentV, float3 bitangentV, float2 texCoord)
+{
+    float3 normal;
+    if (g_Material.NormalTexIndex != -1)
+    {
+        float3x3 TBN = float3x3(normalize(tangentV),
+                                normalize(bitangentV),
+                                normalize(normalV));
+        
+        Texture2D<float4> normalTexture = ResourceDescriptorHeap[g_Material.NormalTexIndex];
+        float3 normalTex = normalTexture.Sample(g_SamplerAnisotropicWrap, texCoord).rgb;
         
         // Expand normal range from [0, 1] to [-1, 1].
         normal = normalTex * 2.0 - 1.0;
@@ -288,15 +299,44 @@ void PS(GeometryInOut pin)
     }
     else
     {
-        normal = normalize(pin.NormalV);
+        normal = normalize(normalV);
     }
-    
-    float metalness = (Mat.HasMetalnessTexture) ?
-        MetalnessTexture.Sample(defaultSampler, pin.TexCoord).b :
-        Mat.Metalness;
-    float roughness = (Mat.HasRoughnessTexture) ?
-        RoughnessTexture.Sample(defaultSampler, pin.TexCoord).g :
-        Mat.Roughness;
+    return normal;
+}
+
+float GetMetalness(float2 texCoord)
+{
+    float metalness = g_Material.Metalness;
+    if (g_Material.MetalnessTexIndex != -1)
+    {
+        Texture2D<float4> metalnessTexture = ResourceDescriptorHeap[g_Material.MetalnessTexIndex];
+        metalness = metalnessTexture.Sample(g_SamplerAnisotropicWrap, texCoord).b;
+    }
+    return metalness;
+}
+
+float GetRoughness(float2 texCoord)
+{
+    float roughness = g_Material.Roughness;
+    if (g_Material.RoughnessTexIndex != -1)
+    {
+        Texture2D<float4> roughnessTexture = ResourceDescriptorHeap[g_Material.RoughnessTexIndex];
+        roughness = roughnessTexture.Sample(g_SamplerAnisotropicWrap, texCoord).g;
+    }
+    return roughness;
+}
+
+void PS(GeometryInOut pin)
+{
+    RWStructuredBuffer<Voxel> voxels = ResourceDescriptorHeap[g_Resources.VoxelIndex];
+
+    float4 albedoCol = GetAlbedo(pin.TexCoord);
+    float3 albedo = albedoCol.rgb;
+    float alpha = albedoCol.a;
+
+    float3 normal = GetNormal(pin.NormalV, pin.TangentV, pin.BitangentV, pin.TexCoord);
+    float metalness = GetMetalness(pin.TexCoord);
+    float roughness = GetRoughness(pin.TexCoord);
     
     uint3 texIndex = uint3(
         (pin.PositionW.x * 0.5 + 0.5f) * VOXEL_DIMENSION,
@@ -306,64 +346,72 @@ void PS(GeometryInOut pin)
     
     if (all(texIndex < VOXEL_DIMENSION) && all(texIndex >= 0))
     {
-        //
-        // Direct lighting calculation for analytical lights (performed in view space)
-        // 
-        
         float ends[] = {
-            gShadowData.CascadeEnds[0].x,
-            gShadowData.CascadeEnds[0].y,
-            gShadowData.CascadeEnds[0].z,
-            gShadowData.CascadeEnds[0].w,
-            gShadowData.CascadeEnds[1].x,
-            gShadowData.CascadeEnds[1].y,
-            gShadowData.CascadeEnds[1].z,
-            gShadowData.CascadeEnds[1].w,
+            g_ShadowData.CascadeEnds[0].x,
+            g_ShadowData.CascadeEnds[0].y,
+            g_ShadowData.CascadeEnds[0].z,
+            g_ShadowData.CascadeEnds[0].w,
+            g_ShadowData.CascadeEnds[1].x,
+            g_ShadowData.CascadeEnds[1].y,
+            g_ShadowData.CascadeEnds[1].z,
+            g_ShadowData.CascadeEnds[1].w,
         };
 
-        int cascadeIndex = -1;
-        for (int i = NUM_CASCADES - 1; i >= 0; i--)
+        int cascadeIndex = -1, i;
+        for (i = NUM_CASCADES - 1; i >= 0; i--)
             if (pin.PositionV.z < ends[i + 1])
                 cascadeIndex = i;
     
         float shadowFactor = 1.0f;
         if (cascadeIndex != -1)
         {
-            shadowFactor = PCSS(gShadowMap, cascadeIndex, gsamShadow, pointSampler, pin.PositionV, gShadowData, gInvView);
+            Texture2DArray shadowMap = ResourceDescriptorHeap[g_Resources.ShadowMapTexIndex];
+
+            float4 positionW = mul(float4(pin.PositionV, 1.0f), g_InvView);
+            float4 positionH = mul(positionW, g_ShadowData.LightViewProj[cascadeIndex]);
+            positionH.xyz /= positionH.w;
+            
+            float depth = positionH.z;
+            
+            // NDC space to texture space
+            // [-1, 1] -> [0, 1] and flip the y-coord
+            float2 shadowMapUV = (positionH.xy + 1.0f) * 0.5f;
+            shadowMapUV.y = 1.0f - shadowMapUV.y;
+
+            shadowFactor = shadowMap.SampleCmpLevelZero(g_SamplerShadow, float3(shadowMapUV, cascadeIndex), depth).r;
         }
         
         float3 directLighting = float3(0, 0, 0);
     
         [loop] // Unrolling produces strange behaviour so adding the [loop] attribute.
-        for (int i = 0; i < 3; i++)
+        for (i = 0; i < 1; i++)
         {
             // Skip lights that are not enabled.
-            if (!Lights[i].Enabled)
+            if (!LightCB[i].Enabled)
                 continue;
         
             // Skip point and spot lights that are out of range of the point being shaded.
-            if (Lights[i].Type != DIRECTIONAL_LIGHT &&
-                 length(Lights[i].PositionVS.xyz - pin.PositionV) > Lights[i].Range)
+            if (LightCB[i].Type != DIRECTIONAL_LIGHT &&
+                 length(LightCB[i].PositionVS.xyz - pin.PositionV) > LightCB[i].Range)
                 continue;
  
-            switch (Lights[i].Type)
+            switch (LightCB[i].Type)
             {
                 case DIRECTIONAL_LIGHT:
-                    directLighting += DoDirectionalLight(Lights[i], albedo, normal, metalness, roughness, pin.PositionV) * shadowFactor;
+                    directLighting += DoDirectionalLight(LightCB[i], albedo, normal, metalness, roughness, pin.PositionV) * shadowFactor;
                     break;
                 case POINT_LIGHT:
-                    directLighting += DoPointLight(Lights[i], albedo, normal, metalness, roughness, pin.PositionV);
+                    directLighting += DoPointLight(LightCB[i], albedo, normal, metalness, roughness, pin.PositionV);
                     break;
                 case SPOT_LIGHT:
-                    directLighting += DoSpotLight(Lights[i], albedo, normal, metalness, roughness, pin.PositionV);
+                    directLighting += DoSpotLight(LightCB[i], albedo, normal, metalness, roughness, pin.PositionV);
                     break;
                 default:
                     break;
             }
         }
         
-        //ImageAtomicRGBA8Avg(gVoxelizerAlbedo, texIndex, float4(directLighting / VOXEL_COMPRESS_COLOR_RANGE, alpha));
-        //InterlockedAdd(gVoxelizerAlbedo[texIndex], convVec4ToRGBA8(float4(directLighting / VOXEL_COMPRESS_COLOR_RANGE * 255.0, alpha)));
-        InterlockedAdd(gVoxelizerAlbedo[texIndex], convVec4ToRGBA8(float4(directLighting * 255.0 / VOXEL_COMPRESS_COLOR_RANGE, alpha)));
+        InterlockedAdd(voxels[Flatten(texIndex)].Radiance, ConvFloat4ToUINT64(float4(directLighting * 50.0, alpha * 255.0)));
+        // ImageAtomicUINT64Avg(voxels, Flatten(texIndex), float4(directLighting, alpha));
     }
 }

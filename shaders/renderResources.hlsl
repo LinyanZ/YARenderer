@@ -22,4 +22,9 @@ struct DeferredLightingRenderResources
 	uint ShadowMapTexIndex;
 };
 
+struct VoxelRenderResources
+{
+    uint VoxelIndex;
+};
+
 #endif // __RENDER_RESOURCES_HLSL__

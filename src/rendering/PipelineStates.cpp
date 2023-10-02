@@ -72,37 +72,37 @@ void PipelineStates::BuildPSOs(Device device)
         Shader VS = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, L"VS", L"vs_6_6");
         Shader PS = Utils::CompileShader(L"shaders\\skybox.hlsl", nullptr, L"PS", L"ps_6_6");
 
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC skyboxDesc = graphicsDesc;
-        skyboxDesc.InputLayout = {skyBoxInputLayout.data(), (UINT)skyBoxInputLayout.size()};
-        skyboxDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
-        skyboxDesc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.InputLayout = {skyBoxInputLayout.data(), (UINT)skyBoxInputLayout.size()};
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
 
         // camera is inside the skybox, so just turn off the culling
-        skyboxDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 
         // skybox is drawn with depth value of z = 1 (NDC), which will fail the depth test
         // if the depth buffer was cleared to 1 and the depth function is LESS
-        skyboxDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&skyboxDesc, IID_PPV_ARGS(&m_PSOs["skybox"])));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["skybox"])));
     }
 
     // shadow pass
     {
         Shader VS = Utils::CompileShader(L"shaders\\shadow.hlsl", nullptr, L"VS", L"vs_6_6");
 
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPassDesc = graphicsDesc;
-        shadowPassDesc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
-        shadowPassDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
 
-        shadowPassDesc.RasterizerState.DepthBias = 100000;
-        shadowPassDesc.RasterizerState.DepthBiasClamp = 10.0f;
-        shadowPassDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+        desc.RasterizerState.DepthBias = 100000;
+        desc.RasterizerState.DepthBiasClamp = 10.0f;
+        desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
 
-        shadowPassDesc.NumRenderTargets = 0;
-        shadowPassDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+        desc.NumRenderTargets = 0;
+        desc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&shadowPassDesc, IID_PPV_ARGS(&m_PSOs["shadow"])));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["shadow"])));
     }
 
     // gbuffer pass
@@ -110,20 +110,20 @@ void PipelineStates::BuildPSOs(Device device)
         Shader VS = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"VS", L"vs_6_6");
         Shader PS = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"PS", L"ps_6_6");
 
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC gbufferDesc = graphicsDesc;
-        gbufferDesc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
-        gbufferDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
-        gbufferDesc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
 
-        gbufferDesc.NumRenderTargets = 6;
-        gbufferDesc.RTVFormats[0] = GBUFFER_ALBEDO_FORMAT;
-        gbufferDesc.RTVFormats[1] = GBUFFER_NORMAL_FORMAT;
-        gbufferDesc.RTVFormats[2] = GBUFFER_METALNESS_FORMAT;
-        gbufferDesc.RTVFormats[3] = GBUFFER_ROUGHNESS_FORMAT;
-        gbufferDesc.RTVFormats[4] = GBUFFER_AMBIENT_FORMAT;
-        gbufferDesc.RTVFormats[5] = GBUFFER_VELOCITY_FORMAT;
+        desc.NumRenderTargets = 6;
+        desc.RTVFormats[0] = GBUFFER_ALBEDO_FORMAT;
+        desc.RTVFormats[1] = GBUFFER_NORMAL_FORMAT;
+        desc.RTVFormats[2] = GBUFFER_METALNESS_FORMAT;
+        desc.RTVFormats[3] = GBUFFER_ROUGHNESS_FORMAT;
+        desc.RTVFormats[4] = GBUFFER_AMBIENT_FORMAT;
+        desc.RTVFormats[5] = GBUFFER_VELOCITY_FORMAT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&gbufferDesc, IID_PPV_ARGS(&m_PSOs["gbuffer"])));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["gbuffer"])));
     }
 
     // deferred lighting pass
@@ -131,14 +131,82 @@ void PipelineStates::BuildPSOs(Device device)
         Shader VS = Utils::CompileShader(L"shaders\\deferredLighting.hlsl", nullptr, L"VS", L"vs_6_6");
         Shader PS = Utils::CompileShader(L"shaders\\deferredLighting.hlsl", nullptr, L"PS", L"ps_6_6");
 
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredLightingDesc = graphicsDesc;
-        deferredLightingDesc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
-        deferredLightingDesc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
 
-        deferredLightingDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-        deferredLightingDesc.DepthStencilState.DepthEnable = false;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.DepthStencilState.DepthEnable = false;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&deferredLightingDesc, IID_PPV_ARGS(&m_PSOs["deferredLighting"])));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["deferredLighting"])));
+    }
+
+    // clear voxel
+    {
+        Shader CS = Utils::CompileShader(L"shaders\\clearVoxel.hlsl", nullptr, L"main", L"cs_6_6");
+
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+        desc.pRootSignature = m_RootSignature.Get();
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["clearVoxel"])));
+    }
+
+    // voxelize
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader GS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"GS", L"gs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.DepthStencilState.DepthEnable = false;
+        desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+        desc.NumRenderTargets = 0;
+        desc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+        desc.InputLayout = {defaultInputLayout.data(), (UINT)defaultInputLayout.size()};
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.GS = CD3DX12_SHADER_BYTECODE(GS->GetBufferPointer(), GS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelize"])));
+    }
+
+    // voxel buffer to texture 3d
+    {
+        Shader CS = Utils::CompileShader(L"shaders\\voxelBuffer2Tex.hlsl", nullptr, L"main", L"cs_6_6");
+
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+        desc.pRootSignature = m_RootSignature.Get();
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelBuffer2Tex"])));
+    }
+
+    // voxel debug
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader GS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"GS", L"gs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        // desc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.GS = CD3DX12_SHADER_BYTECODE(GS->GetBufferPointer(), GS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelDebug"])));
+    }
+
+    // generate voxel mipmap
+    {
+        Shader CS = Utils::CompileShader(L"shaders\\voxelMipmap.hlsl", nullptr, L"main", L"cs_6_6");
+
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+        desc.pRootSignature = m_RootSignature.Get();
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelMipmap"])));
     }
 }
 

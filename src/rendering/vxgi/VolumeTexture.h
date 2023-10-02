@@ -10,11 +10,12 @@ public:
 	void Init(Ref<DxContext> dxContext, UINT size)
 	{
 		m_Device = dxContext->GetDevice();
-		ViewPort = { 0.0f, 0.0f, (float)size, (float)size, 0.0f, 1.0f };
-		ScissorRect = { 0, 0, (int)size, (int)size };
+		ViewPort = {0.0f, 0.0f, (float)size, (float)size, 0.0f, 1.0f};
+		ScissorRect = {0, 0, (int)size, (int)size};
 
 		m_MipLevels = 1;
-		while (size >> m_MipLevels) m_MipLevels++;
+		while (size >> m_MipLevels)
+			m_MipLevels++;
 		Uav.resize(m_MipLevels);
 
 		Srv = dxContext->GetCbvSrvUavHeap().Alloc();
@@ -61,7 +62,7 @@ private:
 		texDesc.DepthOrArraySize = Z;
 		texDesc.MipLevels = m_MipLevels;
 		texDesc.Format = m_Format;
-		texDesc.SampleDesc = { 1, 0 };
+		texDesc.SampleDesc = {1, 0};
 		texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
@@ -71,8 +72,7 @@ private:
 			&texDesc,
 			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 			nullptr,
-			IID_PPV_ARGS(m_Resource.GetAddressOf())
-		));
+			IID_PPV_ARGS(m_Resource.GetAddressOf())));
 	}
 
 	void BuildDescriptors()
@@ -103,8 +103,8 @@ private:
 	Device m_Device;
 	Resource m_Resource;
 
-	DXGI_FORMAT m_SrvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-	DXGI_FORMAT m_UavFormat = DXGI_FORMAT_R32_UINT;
-	DXGI_FORMAT m_Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
+	DXGI_FORMAT m_SrvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	DXGI_FORMAT m_UavFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	DXGI_FORMAT m_Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	UINT m_MipLevels = 0;
 };

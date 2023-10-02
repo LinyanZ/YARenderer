@@ -25,14 +25,14 @@
 
 #include "vxgi/VolumeTexture.h"
 
-#define SPONZA_SCENE 1
+#define SPONZA_SCENE 0
 #define TEST_SCENE (!SPONZA_SCENE)
 
 #define FORWARD_RENDERING 1
 #define DEFERRED_RENDERING 0
 #define FORWARD_PLUS_RENDERING 0
 
-#define VOXEL_DIMENSION 512
+#define VOXEL_DIMENSION 128
 
 struct RenderItem
 {
@@ -125,7 +125,7 @@ private:
 	void ClearVoxel(GraphicsCommandList commandList);
 	void VoxelizeScene(GraphicsCommandList commandList);
 	void DebugVoxel(GraphicsCommandList commandList);
-	void VoxelComputeAverage(GraphicsCommandList commandList);
+	void BufferToTexture3D(GraphicsCommandList commandList);
 	void GenVoxelMipmap(GraphicsCommandList commandList);
 
 	void Debug(GraphicsCommandList commandList, Descriptor srv, int slot = 0);
@@ -178,4 +178,7 @@ private:
 	// VXGI
 	VolumeTexture m_VolumeAlbedo;
 	bool temp = false;
+
+	Resource m_Voxels = nullptr;
+	Descriptor m_VoxelsUAV;
 };

@@ -34,7 +34,7 @@ struct RenderingSettings
 	int DebugVoxelMipLevel = 0;
 
 	// Sun Light
-	float SunTheta = 160;
-	float SunPhi = 45;
-	float SunLightIntensity = 8.0f;
+	float SunTheta = 240;
+	float SunPhi = 40;
+	float SunLightIntensity = 3.0f;
 };

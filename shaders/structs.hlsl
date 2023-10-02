@@ -57,4 +57,9 @@ struct ShadowData
     int NumSamples;
 };
 
+struct Voxel
+{
+    uint64_t Radiance;
+};
+
 #endif // __STRUCTS_HLSL__

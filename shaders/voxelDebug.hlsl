@@ -1,35 +1,14 @@
 #include "common.hlsl"
 #include "cube.hlsl"
+#include "constantBuffers.hlsl"
 
-cbuffer cbPass : register(b0)
+struct Resources
 {
-    float4x4 gView;
-    float4x4 gInvView;
-    float4x4 gProj;
-    float4x4 gInvProj;
-    float4x4 gViewProj;
-    float4x4 gPrevViewProj;
-    float4x4 gInvViewProj;
-    float4x4 gViewProjTex;
-    float3 gEyePosW;
-    float cbPerObjectPad1;
-    float2 gRenderTargetSize;
-    float2 gInvRenderTargetSize;
-    float gNearZ;
-    float gFarZ;
-    float gTotalTime;
-    float gDeltaTime;
-    float2 gJitter;
-    float2 gPreviousJitter;
+    uint TexIndex;
+    uint MipLevel;
 };
 
-cbuffer cbDebugSetting : register(b1)
-{
-    int MipLevel;
-}
-
-Texture3D<float4> albedo : register(t0);
-SamplerState linearSampler : register(s0);
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 struct GeometryOut
 {
@@ -67,8 +46,8 @@ float4 convRGBA8ToVec4(uint val)
 void GS(point uint input[1] : VERTEX_ID, 
         inout TriangleStream<GeometryOut> output)
 {
-    uint voxelDimension = VOXEL_DIMENSION / pow(2, MipLevel);
-    float voxelGridSize = VOXEL_GRID_SIZE * pow(2, MipLevel);
+    uint voxelDimension = VOXEL_DIMENSION / pow(2, g_Resources.MipLevel);
+    float voxelGridSize = VOXEL_GRID_SIZE * pow(2, g_Resources.MipLevel);
     
     uint voxelIndex = input[0];
     uint3 coord = Unflatten(voxelIndex, voxelDimension);
@@ -78,7 +57,8 @@ void GS(point uint input[1] : VERTEX_ID,
     center.y *= -1;
     center *= voxelDimension;
     
-    float4 color = albedo.Load(int4(coord, MipLevel));
+    Texture3D<float4> voxels = ResourceDescriptorHeap[g_Resources.TexIndex];
+    float4 color = voxels.Load(int4(coord, g_Resources.MipLevel));
     if (color.a <= 0)
         return;
 	
@@ -93,7 +73,7 @@ void GS(point uint input[1] : VERTEX_ID,
             tri[j].position.xyz += Cube[i + j].xyz;
             tri[j].position.xyz *= voxelGridSize;
             tri[j].position.xyz += VOXEL_GRID_WORLD_POS;
-            tri[j].position = mul(float4(tri[j].position.xyz, 1), gViewProj);
+            tri[j].position = mul(float4(tri[j].position.xyz, 1), g_ViewProj);
             tri[j].color = color;
             output.Append(tri[j]);
         }
@@ -104,5 +84,6 @@ void GS(point uint input[1] : VERTEX_ID,
 
 float4 PS(GeometryOut pin) : SV_Target
 {
+    // return float4(1,1,1,1);
     return pin.color;
 }
