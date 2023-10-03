@@ -3,7 +3,7 @@
 #include "dx/DxContext.h"
 #include "dx/Descriptor.h"
 
-#define VOXEL_DIMENSION 128
+#define VOXEL_DIMENSION 256
 
 struct Voxel
 {

@@ -9,12 +9,9 @@ class TAA
 public:
 	TAA(Ref<DxContext> dxContext, UINT width, UINT height);
 
-	void Render(GraphicsCommandList commandList, Texture& velocityBuffer, bool isFirstFrame);
+	void Render(GraphicsCommandList commandList, Texture &velocityBuffer);
 	void OnResize(UINT width, UINT height);
-
-private:
-	void BuildRootSignature();
-	void BuildPSO();
+	void Reset() { m_FirstFrame = true; }
 
 private:
 	Ref<DxContext> m_DxContext;
@@ -25,4 +22,6 @@ private:
 
 	Texture m_SourceBuffer;
 	Texture m_HistoryBuffer;
+
+	bool m_FirstFrame = true;
 };

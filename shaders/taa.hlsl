@@ -1,20 +1,25 @@
 // ref: https://alextardif.com/TAA.html
 
+#include "samplers.hlsl"
+
 static const float FLT_EPS = 0.00000001f;
 static const float PI = 3.141592653589793;
+
+struct Resources
+{
+    uint SourceTexIndex;
+    uint HistoryTexIndex;
+    uint DepthTexIndex;
+    uint VelocityTexIndex;
+};
+
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 struct VertexOut
 {
     float4 position : SV_POSITION;
     float2 texcoord : TEXCOORD;
 };
-
-Texture2D source : register(t0);
-Texture2D history : register(t1);
-Texture2D depth : register(t2);
-Texture2D velocity : register(t3);
-
-SamplerState linearSampler : register(s0);
 
 VertexOut VS(uint vertexID : SV_VertexID)
 {
@@ -93,46 +98,6 @@ float4 SampleTextureCatmullRom(in Texture2D<float4> tex, in SamplerState linearS
     return result;
 }
 
-// ref: https://github.com/playdeadgames/temporal/blob/master/Assets/Shaders/TemporalReprojection.shader
-float3 ClipAABB(float3 aabbMin, float3 aabbMax, float3 p)
-{
-#if USE_OPTIMIZATIONS
-		// note: only clips towards aabb center (but fast!)
-		float3 p_clip = 0.5 * (aabbMax + aabbMin);
-		float3 e_clip = 0.5 * (aabbMax - aabbMin) + FLT_EPS;
-
-		float4 v_clip = q - float4(p_clip, p.w);
-		float3 v_unit = v_clip.xyz / e_clip;
-		float3 a_unit = abs(v_unit);
-		float ma_unit = max(a_unit.x, max(a_unit.y, a_unit.z));
-
-		if (ma_unit > 1.0)
-			return float4(p_clip, p.w) + v_clip / ma_unit;
-		else
-			return q;// point inside aabb
-#else
-    float3 r = p;
-
-    const float eps = FLT_EPS;
-
-    if (r.x > aabbMax.x + eps)
-        r *= (aabbMax.x / r.x);
-    if (r.y > aabbMax.y + eps)
-        r *= (aabbMax.y / r.y);
-    if (r.z > aabbMax.z + eps)
-        r *= (aabbMax.z / r.z);
-
-    if (r.x < aabbMin.x - eps)
-        r *= (aabbMin.x / r.x);
-    if (r.y < aabbMin.y - eps)
-        r *= (aabbMin.y / r.y);
-    if (r.z < aabbMin.z - eps)
-        r *= (aabbMin.z / r.z);
-
-    return r;
-#endif
-}
-
 float Luminance(float3 color)
 {
     return dot(color, float3(0.2127, 0.7152, 0.0722));
@@ -140,6 +105,11 @@ float Luminance(float3 color)
 
 float4 PS(VertexOut pin) : SV_Target
 {
+    Texture2D source = ResourceDescriptorHeap[g_Resources.SourceTexIndex];
+    Texture2D history = ResourceDescriptorHeap[g_Resources.HistoryTexIndex];
+    Texture2D depth = ResourceDescriptorHeap[g_Resources.DepthTexIndex];
+    Texture2D velocity = ResourceDescriptorHeap[g_Resources.VelocityTexIndex];
+
     int width, height, level;
     source.GetDimensions(0, width, height, level);
     
@@ -192,7 +162,7 @@ float4 PS(VertexOut pin) : SV_Target
     if (any(historyTexCoord != saturate(historyTexCoord)))
         return float4(sourceSample, 1.0);
     
-    float3 historySample = SampleTextureCatmullRom(history, linearSampler, historyTexCoord, float2(width, height)).rgb;
+    float3 historySample = SampleTextureCatmullRom(history, g_SamplerLinearWrap, historyTexCoord, float2(width, height)).rgb;
     
     float invSampleCount = 1.0 / 9.0;
     float gamma = 1.0;
@@ -201,7 +171,6 @@ float4 PS(VertexOut pin) : SV_Target
     float3 minc = mu - gamma * sigma;
     float3 maxc = mu + gamma * sigma;
     
-    //historySample = ClipAABB(minc, maxc, clamp(historySample, neighborhoodMin, neighborhoodMax));
     historySample = clamp(historySample, neighborhoodMin, neighborhoodMax);
     
     float sourceWeight = 0.05;

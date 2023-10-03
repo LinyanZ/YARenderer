@@ -5,7 +5,7 @@
 #define SPOT_LIGHT 1
 #define DIRECTIONAL_LIGHT 2
 
-static const uint VOXEL_DIMENSION = 128;
+static const uint VOXEL_DIMENSION = 256;
 static const float VOXEL_GRID_SIZE = 0.1;
 static const float3 VOXEL_GRID_WORLD_POS = 0;
 static const float VOXEL_COMPRESS_COLOR_RANGE = 10.0;

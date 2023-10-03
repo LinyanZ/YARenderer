@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "Renderer.h"
 #include "RenderingSettings.h"
-#include "core/MathHelper.h"
 
 extern RenderingSettings g_RenderingSettings;
 
@@ -155,8 +154,7 @@ void Renderer::Render()
 	{
 		DebugVoxel(commandList);
 
-		// Reset for TAA
-		m_FirstFrame = true;
+		m_TAA->Reset();
 	}
 	else
 	{
@@ -168,7 +166,10 @@ void Renderer::Render()
 		DeferredLightingPass(commandList);
 
 		DrawSkybox(commandList);
-		// 	m_TAA->Render(commandList, m_VelocityBuffer, m_FirstFrame);
+
+		if (g_RenderingSettings.AntialisingMethod == Antialising::TAA)
+			m_TAA->Render(commandList, m_GBufferVelocity);
+
 		// 	m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
 	}
 
@@ -192,9 +193,6 @@ void Renderer::EndFrame()
 
 	CurrFrameResource()->Fence = m_DxContext->ExecuteCommandList();
 	m_DxContext->Present(g_RenderingSettings.EnableVSync);
-
-	if (!g_RenderingSettings.GI.DebugVoxel)
-		m_FirstFrame = false;
 }
 
 //
@@ -757,18 +755,22 @@ void Renderer::UpdateObjectConstantBuffers()
 
 void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 {
-	float haltonX = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 2) - 1.0f;
-	float haltonY = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 3) - 1.0f;
-	float jitterX = (haltonX / m_Width);
-	float jitterY = (haltonY / m_Height);
-	jitterX = 0.0f;
-	jitterY = 0.0f;
-
 	XMMATRIX view = m_Camera.GetView();
 	XMMATRIX proj = m_Camera.GetProj();
 
-	XMMATRIX jitterTranslation = XMMatrixTranslation(jitterX, jitterY, 0);
-	proj = XMMatrixMultiply(proj, jitterTranslation);
+	// apply jitter if using taa
+	float jitterX = 0, jitterY = 0;
+
+	if (g_RenderingSettings.AntialisingMethod == Antialising::TAA)
+	{
+		float haltonX = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 2) - 1.0f;
+		float haltonY = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 3) - 1.0f;
+		jitterX = (haltonX / m_Width);
+		jitterY = (haltonY / m_Height);
+
+		XMMATRIX jitterTranslation = XMMatrixTranslation(jitterX, jitterY, 0);
+		proj = XMMatrixMultiply(proj, jitterTranslation);
+	}
 
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
@@ -789,6 +791,7 @@ void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 	XMStoreFloat4x4(&m_MainPassCB.Proj, XMMatrixTranspose(proj));
 	XMStoreFloat4x4(&m_MainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&m_MainPassCB.ViewProjMatrix, XMMatrixTranspose(viewProj));
+	XMStoreFloat4x4(&m_MainPassCB.PrevViewProjMatrix, XMMatrixTranspose(m_PrevViewProjMatrix));
 	XMStoreFloat4x4(&m_MainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
 	XMStoreFloat4x4(&m_MainPassCB.ProjTex, XMMatrixTranspose(projTex));
 	m_MainPassCB.EyePosW = m_Camera.GetPosition3f();
@@ -798,23 +801,19 @@ void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 	m_MainPassCB.FarZ = 1000.0f;
 	m_MainPassCB.TotalTime = timer.TotalTime();
 	m_MainPassCB.DeltaTime = timer.DeltaTime();
-	m_MainPassCB.Jitter = XMFLOAT2(jitterX, jitterY);
 	m_MainPassCB.EnableGI = g_RenderingSettings.GI.Enable;
 
-	if (!m_FirstFrame)
-	{
-		XMStoreFloat4x4(&m_MainPassCB.PrevViewProjMatrix, XMMatrixTranspose(m_PrevViewProjMatrix));
-		m_MainPassCB.PreviousJitter = XMFLOAT2(m_PreviousJitterX, m_PreviousJitterY);
-	}
-
-	auto currPassCB = CurrFrameResource()->PassCB.get();
-	currPassCB->CopyData(0, m_MainPassCB);
+	m_MainPassCB.Jitter = XMFLOAT2(jitterX, jitterY);
+	m_MainPassCB.PreviousJitter = XMFLOAT2(m_PreviousJitterX, m_PreviousJitterY);
 
 	m_PrevViewProjMatrix = viewProj;
 	m_PreviousJitterX = jitterX;
 	m_PreviousJitterY = jitterY;
 	m_JitterIndex++;
 	m_JitterIndex %= 16;
+
+	auto currPassCB = CurrFrameResource()->PassCB.get();
+	currPassCB->CopyData(0, m_MainPassCB);
 }
 
 void Renderer::UpdateMaterialConstantBuffer()

@@ -142,6 +142,4 @@ private:
 	UINT m_JitterIndex = 0;
 	float m_PreviousJitterX = 0;
 	float m_PreviousJitterY = 0;
-
-	bool m_FirstFrame = true;
 };
