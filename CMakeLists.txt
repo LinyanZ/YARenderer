@@ -90,17 +90,8 @@ set(SRC_FILES
     src/rendering/VXGI.h
     src/rendering/VXGI.cpp
 
-    src/rendering/postProcessing/FXAA.h
-    src/rendering/postProcessing/FXAA.cpp
-
-    src/rendering/postProcessing/MotionBlur.h
-    src/rendering/postProcessing/MotionBlur.cpp
-
-    src/rendering/postProcessing/PostProcessing.h
-    src/rendering/postProcessing/PostProcessing.cpp
-
-    src/rendering/postProcessing/ToneMapping.h
-    src/rendering/postProcessing/ToneMapping.cpp
+    src/rendering/PostProcessing.h
+    src/rendering/PostProcessing.cpp
 
     src/rendering/PipelineStates.h
     src/rendering/PipelineStates.cpp

@@ -32,13 +32,14 @@ struct RenderingSettings
 	// Post Processing
 	Antialising AntialisingMethod = Antialising::TAA;
 	bool EnableToneMapping = true;
+	float Exposure = 0.3;
 	bool EnableMotionBlur = true;
-	float MotionBlurAmount = 0.25;
+	float MotionBlurAmount = 0.5;
 
 	VXGISettings GI;
 
 	// Sun Light
 	float SunTheta = 240;
 	float SunPhi = 40;
-	float SunLightIntensity = 3.0f;
+	float SunLightIntensity = 4.0f;
 };

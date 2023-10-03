@@ -122,7 +122,7 @@ void UI::Render()
         if (ImGui::TreeNode("Motion Blur"))
         {
             ImGui::Checkbox("Enable", &g_RenderingSettings.EnableMotionBlur);
-            ImGui::SliderFloat("Amount", &g_RenderingSettings.MotionBlurAmount, 0.0f, 1.0f, "%.3f");
+            ImGui::SliderFloat("Amount", &g_RenderingSettings.MotionBlurAmount, 0.0f, 2.0f, "%.3f");
             ImGui::TreePop();
         }
 
@@ -136,6 +136,7 @@ void UI::Render()
         if (ImGui::TreeNode("Tone Mapping"))
         {
             ImGui::Checkbox("Enable", &g_RenderingSettings.EnableToneMapping);
+            ImGui::SliderFloat("Exposure", &g_RenderingSettings.Exposure, 0.0f, 2.0f, "%.3f");
             ImGui::TreePop();
         }
     }

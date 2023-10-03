@@ -1,39 +1,25 @@
 // reference: http://blog.simonrodriguez.fr/articles/2016/07/implementing_fxaa.html
+#include "fullscreen.hlsl"
+#include "samplers.hlsl"
 
 #define NUM_SAMPLES 4
 
-struct VertexOut
+struct Resources
 {
-    float4 position : SV_POSITION;
-    float2 texcoord : TEXCOORD;
-};
-
-cbuffer Setting : register(b0)
-{
+    uint InputTexIndex;
+    uint VelocityTexIndex;
     float MotionBlurAmount;
 };
 
-Texture2D source : register(t0);
-Texture2D velocity : register(t1);
-
-SamplerState linearSampler : register(s0);
-
-VertexOut VS(uint vertexID : SV_VertexID)
-{
-    VertexOut vout;
-    
-    // draw a triangle that covers the entire screen
-    const float2 tex = float2(uint2(vertexID, vertexID << 1) & 2);
-    vout.position = float4(lerp(float2(-1, 1), float2(1, -1), tex), 0, 1);
-    vout.texcoord = tex;
-    
-    return vout;
-}
+ConstantBuffer<Resources> g_Resouces : register(b6);
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    float2 texCoord = pin.texcoord;
-    float2 motionVector = velocity.Sample(linearSampler, texCoord).rg * float2(0.5, -0.5) * MotionBlurAmount;
+    Texture2D input = ResourceDescriptorHeap[g_Resouces.InputTexIndex];
+    Texture2D velocity = ResourceDescriptorHeap[g_Resouces.VelocityTexIndex];
+
+    float2 texCoord = pin.TexCoord;
+    float2 motionVector = velocity.Sample(g_SamplerLinearClamp, texCoord).rg * float2(0.5, -0.5) * g_Resouces.MotionBlurAmount;
     
     float4 color = 0;
     float totalWeights = 0;
@@ -41,7 +27,7 @@ float4 PS(VertexOut pin) : SV_Target
     for (int i = 0; i < NUM_SAMPLES; i++, texCoord += motionVector)
     {
         float weight = NUM_SAMPLES - i;
-        color += source.Sample(linearSampler, texCoord) * weight;
+        color += input.Sample(g_SamplerLinearClamp, texCoord) * weight;
         totalWeights += weight;
     }
     

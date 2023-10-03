@@ -12,7 +12,7 @@
 #include "FrameResource.h"
 #include "PipelineStateManager.h"
 #include "Camera.h"
-#include "postProcessing/PostProcessing.h"
+#include "PostProcessing.h"
 #include "Material.h"
 #include "Light.h"
 #include "Mesh.h"

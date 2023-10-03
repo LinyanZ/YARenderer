@@ -155,6 +155,48 @@ void PipelineStates::BuildPSOs(Device device)
         ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["taa"])));
     }
 
+    // fxaa
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\fxaa.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\fxaa.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.DepthStencilState.DepthEnable = false;
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["fxaa"])));
+    }
+
+    // motion blur
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\motionBlur.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\motionBlur.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.DepthStencilState.DepthEnable = false;
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["motionBlur"])));
+    }
+
+    // tone mapping
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\toneMapping.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\toneMapping.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.DepthStencilState.DepthEnable = false;
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["toneMapping"])));
+    }
+
     // clear voxel
     {
         Shader CS = Utils::CompileShader(L"shaders\\clearVoxel.hlsl", nullptr, L"main", L"cs_6_6");

@@ -170,7 +170,7 @@ void Renderer::Render()
 		if (g_RenderingSettings.AntialisingMethod == Antialising::TAA)
 			m_TAA->Render(commandList, m_GBufferVelocity);
 
-		// 	m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_VelocityBuffer);
+		m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_GBufferVelocity);
 	}
 
 	// Debug(commandList, m_GBufferAlbedo.Srv, 0);

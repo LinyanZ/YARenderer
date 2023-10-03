@@ -1,5 +1,9 @@
 // reference: http://blog.simonrodriguez.fr/articles/2016/07/implementing_fxaa.html
 
+#include "constantBuffers.hlsl"
+#include "samplers.hlsl"
+#include "fullscreen.hlsl"
+
 static const float EDGE_THRESHOLD_MIN = 0.0312;
 static const float EDGE_THRESHOLD_MAX = 0.125;
 static const int ITERATIONS = 12;
@@ -7,32 +11,12 @@ static const float SUBPIXEL_QUALITY = 0.75;
 
 static const float QUALITY[12] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0 };
 
-cbuffer inverseScreenSize : register(b0)
+struct Resources
 {
-    float inverseScreenSizeX;
-    float inverseScreenSizeY;
+    uint InputTexIndex;
 };
 
-struct VertexOut
-{
-    float4 position : SV_POSITION;
-    float2 texcoord : TEXCOORD;
-};
-
-Texture2D sceneColor : register(t0);
-SamplerState defaultSampler : register(s0);
-
-VertexOut VS(uint vertexID : SV_VertexID)
-{
-    VertexOut vout;
-    
-    // draw a triangle that covers the entire screen
-    const float2 tex = float2(uint2(vertexID, vertexID << 1) & 2);
-    vout.position = float4(lerp(float2(-1, 1), float2(1, -1), tex), 0, 1);
-    vout.texcoord = tex;
-    
-    return vout;
-}
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 float rgb2luma(float3 rgb)
 {
@@ -41,17 +25,19 @@ float rgb2luma(float3 rgb)
 
 float4 PS(VertexOut pin) : SV_Target
 {
+    Texture2D input = ResourceDescriptorHeap[g_Resources.InputTexIndex];
+
     // the original color
-    float3 colorCenter = sceneColor.Sample(defaultSampler, pin.texcoord).rgb;
+    float3 colorCenter = input.Sample(g_SamplerLinearWrap, pin.TexCoord).rgb;
     
     // luma at the current pixel
     float lumaCenter = rgb2luma(colorCenter);
     
     // luma at the four direct neighbours of the current pixel
-    float lumaDown   = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(0, -1)).rgb);
-    float lumaUp     = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(0, 1)).rgb);
-    float lumaLeft   = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(-1, 0)).rgb);
-    float lumaRight  = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(1, 0)).rgb);
+    float lumaDown   = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(0, -1)).rgb);
+    float lumaUp     = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(0, 1)).rgb);
+    float lumaLeft   = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(-1, 0)).rgb);
+    float lumaRight  = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(1, 0)).rgb);
     
     // find the maximum and minimum luma around the current pixel
     float lumaMin = min(lumaCenter, min(min(lumaDown, lumaUp), min(lumaLeft, lumaRight)));
@@ -66,10 +52,10 @@ float4 PS(VertexOut pin) : SV_Target
         return float4(colorCenter, 1.0f);
     
     // query the 4 remaining corners lumas
-    float lumaDownLeft   = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(-1, -1)).rgb);
-    float lumaDownRight  = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(1, -1)).rgb);
-    float lumaUpLeft     = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(-1, 1)).rgb);
-    float lumaUpRight    = rgb2luma(sceneColor.Sample(defaultSampler, pin.texcoord, int2(1, 1)).rgb);
+    float lumaDownLeft   = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(-1, -1)).rgb);
+    float lumaDownRight  = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(1, -1)).rgb);
+    float lumaUpLeft     = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(-1, 1)).rgb);
+    float lumaUpRight    = rgb2luma(input.Sample(g_SamplerLinearWrap, pin.TexCoord, int2(1, 1)).rgb);
     
     // combine the four edges lumas (using intermediary variables for
     // future computations with the same values)
@@ -103,7 +89,7 @@ float4 PS(VertexOut pin) : SV_Target
     float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
     
     // choose the step size (one pixel) according to the edge direction
-    float stepLength = isHorizontal ? inverseScreenSizeY : inverseScreenSizeX;
+    float stepLength = isHorizontal ? g_InvRenderTargetSize.y : g_InvRenderTargetSize.x;
     
     // average luma in the correct direction
     float lumaLocalAverage;
@@ -120,7 +106,7 @@ float4 PS(VertexOut pin) : SV_Target
     }
     
     // shift UV in the correct direction by half a pixel
-    float2 currentUV = pin.texcoord;
+    float2 currentUV = pin.TexCoord;
     
     if (isHorizontal)
         currentUV.y += stepLength * 0.5;
@@ -128,7 +114,7 @@ float4 PS(VertexOut pin) : SV_Target
         currentUV.x += stepLength * 0.5;
     
     // compute offset (for each iteration step) in the right direction
-    float2 offset = isHorizontal ? float2(inverseScreenSizeX, 0.0) : float2(0.0, inverseScreenSizeY);
+    float2 offset = isHorizontal ? float2(g_InvRenderTargetSize.x, 0.0) : float2(0.0, g_InvRenderTargetSize.y);
     
     // compute UVs to explore on each side of the edge, orthogonally
     // the QUALITY allows us to step further
@@ -137,8 +123,8 @@ float4 PS(VertexOut pin) : SV_Target
     
     // read the lumas at both current extremities of the exploration segment
     // and compute the delta wrt to the local average luma
-    float lumaEnd1 = rgb2luma(sceneColor.Sample(defaultSampler, uv1).rgb);
-    float lumaEnd2 = rgb2luma(sceneColor.Sample(defaultSampler, uv2).rgb);
+    float lumaEnd1 = rgb2luma(input.Sample(g_SamplerLinearWrap, uv1).rgb);
+    float lumaEnd2 = rgb2luma(input.Sample(g_SamplerLinearWrap, uv2).rgb);
     lumaEnd1 -= lumaLocalAverage;
     lumaEnd2 -= lumaLocalAverage;
     
@@ -159,13 +145,13 @@ float4 PS(VertexOut pin) : SV_Target
         {
             if (!reached1)
             {
-                lumaEnd1 = rgb2luma(sceneColor.Sample(defaultSampler, uv1).rgb);
+                lumaEnd1 = rgb2luma(input.Sample(g_SamplerLinearWrap, uv1).rgb);
                 lumaEnd1 -= lumaLocalAverage;
             }
             
             if (!reached2)
             {
-                lumaEnd2 = rgb2luma(sceneColor.Sample(defaultSampler, uv2).rgb);
+                lumaEnd2 = rgb2luma(input.Sample(g_SamplerLinearWrap, uv2).rgb);
                 lumaEnd2 -= lumaLocalAverage;
             }
             
@@ -189,8 +175,8 @@ float4 PS(VertexOut pin) : SV_Target
     }
     
     // compute the distances to each extremity of the edge
-    float distance1 = isHorizontal ? (pin.texcoord.x - uv1.x) : (pin.texcoord.y - uv1.y);
-    float distance2 = isHorizontal ? (uv2.x - pin.texcoord.x) : (uv2.y - pin.texcoord.y);
+    float distance1 = isHorizontal ? (pin.TexCoord.x - uv1.x) : (pin.TexCoord.y - uv1.y);
+    float distance2 = isHorizontal ? (uv2.x - pin.TexCoord.x) : (uv2.y - pin.TexCoord.y);
     
     // in which direction is the extremity of the edge closer?
     bool closerToDirection1 = distance1 < distance2;
@@ -229,11 +215,11 @@ float4 PS(VertexOut pin) : SV_Target
     finalOffset = max(finalOffset, subPixelOffset);
     
     // compute the final UV coordinates
-    float2 finalUV = pin.texcoord;
+    float2 finalUV = pin.TexCoord;
     if (isHorizontal)
         finalUV.y += finalOffset * stepLength;
     else
         finalUV.x += finalOffset * stepLength;
     
-    return float4(sceneColor.Sample(defaultSampler, finalUV).rgb, 1.0);
+    return float4(input.Sample(g_SamplerLinearWrap, finalUV).rgb, 1.0);
 }
