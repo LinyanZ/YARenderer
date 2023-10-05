@@ -27,7 +27,7 @@ float2 SampleHammersley(uint i, float invNumSamples)
 // See: "Physically Based Rendering" 2nd ed., section 13.6.1.
 float3 SampleHemisphere(float u, float v)
 {
-    float phi = v * TwoPI;
+    float phi = v * TWO_PI;
     float cosTheta = 1.0 - u;
     float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
     return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
@@ -42,7 +42,7 @@ float3 SampleGGX(float u1, float u2, float roughness)
 
     float cosTheta = sqrt((1.0 - u2) / (1.0 + (alpha * alpha - 1.0) * u2));
     float sinTheta = sqrt(1.0 - cosTheta * cosTheta); // Trig. identity
-    float phi = TwoPI * u1;
+    float phi = TWO_PI * u1;
 
 	// Convert to Cartesian upon return.
     return float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);

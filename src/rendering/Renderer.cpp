@@ -144,6 +144,9 @@ void Renderer::Render()
 	// cascaded shadow from directional light
 	ShadowMapPass(commandList);
 
+	if (g_RenderingSettings.GI.DebugVoxel || g_RenderingSettings.AntialisingMethod != Antialising::TAA)
+		m_TAA->Reset();
+
 	if (g_RenderingSettings.GI.DynamicUpdate)
 	{
 		commandList->SetComputeRootSignature(PipelineStates::GetRootSignature());
@@ -153,8 +156,6 @@ void Renderer::Render()
 	if (g_RenderingSettings.GI.DebugVoxel)
 	{
 		DebugVoxel(commandList);
-
-		m_TAA->Reset();
 	}
 	else
 	{
@@ -502,7 +503,8 @@ void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
 						m_GBufferRoughness.Srv.Index,
 						m_GBufferAmbient.Srv.Index,
 						m_DxContext->DepthStencilBuffer().Srv.Index,
-						m_CascadedShadowMap->Srv(4).Index};
+						m_CascadedShadowMap->Srv(4).Index,
+						m_VXGI->GetTextureSrv().Index};
 
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
 
@@ -761,7 +763,7 @@ void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 	// apply jitter if using taa
 	float jitterX = 0, jitterY = 0;
 
-	if (g_RenderingSettings.AntialisingMethod == Antialising::TAA)
+	if (!g_RenderingSettings.GI.DebugVoxel && g_RenderingSettings.AntialisingMethod == Antialising::TAA)
 	{
 		float haltonX = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 2) - 1.0f;
 		float haltonY = 2.0f * RenderingUtils::Halton(m_JitterIndex + 1, 3) - 1.0f;

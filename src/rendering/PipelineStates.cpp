@@ -96,7 +96,7 @@ void PipelineStates::BuildPSOs(Device device)
         desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
 
         desc.RasterizerState.DepthBias = 100000;
-        desc.RasterizerState.DepthBiasClamp = 10.0f;
+        desc.RasterizerState.DepthBiasClamp = 0.0f;
         desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
 
         desc.NumRenderTargets = 0;

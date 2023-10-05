@@ -16,19 +16,11 @@ ConstantBuffer<Resources> g_Resources : register(b6);
 
 float3 DoDirectLighting(Light light, float3 albedo, float3 normal, float metalness, float roughness, float3 L, float3 V)
 {
-    // Calculate angles between surface normal and various light vectors.
     float NdotL = max(0.0, dot(normal, L));
-
-    // Diffuse scattering happens due to light being refracted multiple times by a dielectric medium.
-    // Metals on the other hand either reflect or absorb energy, so diffuse contribution is always zero.
-    // To be energy conserving we must scale diffuse BRDF contribution based on Fresnel factor & metalness.
     float3 kd = lerp(float3(1, 1, 1), float3(0, 0, 0), metalness);
 
     // Lambert diffuse BRDF.
-    // We don't scale by 1/PI for lighting & material units to be more convenient.
-    // See: https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
     float3 diffuseBRDF = kd * albedo;
-    
     return diffuseBRDF * light.Color.xyz * NdotL;
 }
 
@@ -210,23 +202,9 @@ void PS(GeometryInOut pin)
     
     if (all(texIndex < VOXEL_DIMENSION) && all(texIndex >= 0))
     {
-        float ends[] = {
-            g_ShadowData.CascadeEnds[0].x,
-            g_ShadowData.CascadeEnds[0].y,
-            g_ShadowData.CascadeEnds[0].z,
-            g_ShadowData.CascadeEnds[0].w,
-            g_ShadowData.CascadeEnds[1].x,
-            g_ShadowData.CascadeEnds[1].y,
-            g_ShadowData.CascadeEnds[1].z,
-            g_ShadowData.CascadeEnds[1].w,
-        };
-
-        int cascadeIndex = -1, i;
-        for (i = NUM_CASCADES - 1; i >= 0; i--)
-            if (pin.PositionV.z < ends[i + 1])
-                cascadeIndex = i;
-    
         float shadowFactor = 1.0f;
+
+        int cascadeIndex = GetCascadeIndex(pin.PositionV);
         if (cascadeIndex != -1)
         {
             Texture2DArray shadowMap = ResourceDescriptorHeap[g_Resources.ShadowMapTexIndex];
@@ -248,7 +226,7 @@ void PS(GeometryInOut pin)
         float3 directLighting = float3(0, 0, 0);
     
         [loop] // Unrolling produces strange behaviour so adding the [loop] attribute.
-        for (i = 0; i < 1; i++)
+        for (int i = 0; i < 1; i++)
         {
             // Skip lights that are not enabled.
             if (!LightCB[i].Enabled)

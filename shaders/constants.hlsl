@@ -11,7 +11,7 @@ static const float3 VOXEL_GRID_WORLD_POS = 0;
 static const float VOXEL_COMPRESS_COLOR_RANGE = 10.0;
 
 static const float PI = 3.141592653589793;
-static const float TwoPI = 2 * PI;
+static const float TWO_PI = 2 * PI;
 static const float Epsilon = 0.00001;
 
 // Constant normal incidence Fresnel factor for all dielectrics.

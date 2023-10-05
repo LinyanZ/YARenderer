@@ -39,7 +39,10 @@ struct RenderingSettings
 	VXGISettings GI;
 
 	// Sun Light
-	float SunTheta = 240;
-	float SunPhi = 40;
-	float SunLightIntensity = 4.0f;
+	float SunTheta = 146;
+	float SunPhi = 30;
+	float SunLightIntensity = 8.0f;
+	// float SunTheta = 240;
+	// float SunPhi = 40;
+	// float SunLightIntensity = 4.0f;
 };

@@ -24,7 +24,7 @@
 #include "TAA.h"
 #include "VXGI.h"
 
-#define SPONZA_SCENE 0
+#define SPONZA_SCENE 1
 #define TEST_SCENE (!SPONZA_SCENE)
 
 struct RenderItem

@@ -30,7 +30,11 @@ void main(uint3 texCoord : SV_DispatchThreadID)
     
     color.rgb /= 50.0;
     color.a /= 255.0;
+
+    // avoid very bright spot when alpha is low
+    color.a = max(color.a, 1); 
     color /= color.a;
+
     tex[texCoord] = color;
 
     // color.rgb /= 255.0;

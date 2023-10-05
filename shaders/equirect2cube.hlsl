@@ -1,5 +1,5 @@
 static const float PI = 3.141592;
-static const float TwoPI = 2 * PI;
+static const float TWO_PI = 2 * PI;
 
 Texture2D inputTexture : register(t0);
 RWTexture2DArray<float4> outputTexture : register(u0);
@@ -53,7 +53,7 @@ void main(uint3 threadID : SV_DispatchthreadID)
     float theta = acos(v.y);
 
 	// Sample equirectangular texture.
-    float4 color = inputTexture.SampleLevel(defaultSampler, float2(phi / TwoPI, theta / PI), 0);
+    float4 color = inputTexture.SampleLevel(defaultSampler, float2(phi / TWO_PI, theta / PI), 0);
 
 	// Write out color to output cubemap.
     outputTexture[threadID] = color;

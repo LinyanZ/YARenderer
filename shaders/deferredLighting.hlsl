@@ -2,6 +2,7 @@
 #include "lightingUtils.hlsl"
 #include "samplers.hlsl"
 #include "cascadedShadow.hlsl"
+#include "voxelUtils.hlsl"
 
 struct Resources
 {
@@ -12,6 +13,7 @@ struct Resources
 	uint AmbientTexIndex;
 	uint DepthTexIndex;
 	uint ShadowMapTexIndex;
+    uint VoxelTexIndex;
 };
 
 ConstantBuffer<Resources> g_Resources : register(b6);
@@ -74,9 +76,8 @@ float4 PS(VertexOut pin) : SV_Target
     float depth = depthTex.Load(int3(texCoord, 0));
     float3 positionV = ScreenToView(float4(texCoord, depth, 1.0f)).xyz;
 
-    float2 cascadeShadowResult = CascadeShadowWithPCSS(shadowMap, positionV);
-    float shadowFactor = cascadeShadowResult[0];
-    float cascadeIndex = cascadeShadowResult[1];
+    int cascadeIndex = GetCascadeIndex(positionV);
+    float shadowFactor = CascadedShadowWithPCSS(shadowMap, cascadeIndex, positionV);
     
     float3 directLighting = float3(0, 0, 0);
     
@@ -118,6 +119,21 @@ float4 PS(VertexOut pin) : SV_Target
             default:
                 break;
         }
+    }
+
+    if (g_EnableGI)
+    {
+        Texture3D voxels = ResourceDescriptorHeap[g_Resources.VoxelTexIndex];
+
+        float3 positionW = mul(float4(positionV, 1.0f), g_InvView).xyz;
+        float3 normalW = mul(float4(normal, 0.0f), g_InvView).xyz;
+        float3 V = normalize(g_EyePosW - positionW);
+    
+        float4 diffuseIndirectColor = TraceDiffuseCone(voxels, g_SamplerLinearClamp, positionW, normalW);
+        float4 specularIndirectColor = TraceSpecularCone(voxels, g_SamplerLinearClamp, positionW, normalW, V, roughness);
+        
+        ambient += diffuseIndirectColor.rgb;
+        ambient += specularIndirectColor.rgb;
     }
 
     return float4(directLighting + ambient * albedo, alpha);

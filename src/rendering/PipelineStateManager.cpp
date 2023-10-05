@@ -14,12 +14,8 @@ PipelineStateManager::PipelineStateManager(Device device)
 
 void PipelineStateManager::BuildShadersAndInputLayouts()
 {
-	// m_VSByteCodes["default"] = Utils::CompileShader(L"shaders\\defaultVS.hlsl", nullptr, L"VS", L"vs_6_6");
-
 	// m_PSByteCodes["drawNormal"] = Utils::CompileShader(L"shaders\\drawNormal.hlsl", nullptr, L"PS", L"ps_6_6");
 	// m_PSByteCodes["forwardRendering"] = Utils::CompileShader(L"shaders\\forwardRendering.hlsl", nullptr, L"PS", L"ps_6_6");
-
-	// m_PSByteCodes["gbuffer"] = Utils::CompileShader(L"shaders\\gbuffer.hlsl", nullptr, L"PS", L"ps_6_6");
 
 	// m_VSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassVS.hlsl", nullptr, L"VS", L"vs_6_6");
 	// m_PSByteCodes["lightingPass"] = Utils::CompileShader(L"shaders\\lightingPassPS.hlsl", nullptr, L"PS", L"ps_6_6");
@@ -29,43 +25,10 @@ void PipelineStateManager::BuildShadersAndInputLayouts()
 
 	m_VSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"VS", L"vs_6_6");
 	m_PSByteCodes["debug"] = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"PS", L"ps_6_6");
-
-	m_InputLayouts["default"] =
-		{
-			{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"BITANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-		};
-
-	m_InputLayouts["skybox"] =
-		{
-			{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 }
 
 void PipelineStateManager::BuildRootSignatures()
 {
-	// universal root signature
-	{
-		UINT MaxNumConstants = 32; // temporary limit
-
-		auto staticSamplers = GetStaticSamplers();
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-		slotRootParameter[0].InitAsConstantBufferView(0); // object constant buffer
-		slotRootParameter[1].InitAsConstantBufferView(1); // pass constant buffer
-		slotRootParameter[2].InitAsConstants(MaxNumConstants, 2);
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter,
-										 staticSamplers.size(), staticSamplers.data(),
-										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-											 D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-											 D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
-
-		m_RootSignatures["universal"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
 	// draw normal
 	{
 		CD3DX12_DESCRIPTOR_RANGE descriptorRanges[] =
@@ -148,55 +111,6 @@ void PipelineStateManager::BuildRootSignatures()
 		m_RootSignatures["forwardRendering"] = Utils::CreateRootSignature(m_Device, desc);
 	}
 
-	// cascade shadow map root signature
-	{
-		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-		slotRootParameter[0].InitAsConstantBufferView(0); // object cbuffer
-		slotRootParameter[1].InitAsConstantBufferView(1); // shadow pass cbuffer
-		slotRootParameter[2].InitAsConstants(1, 2);		  // cascade shadow index
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter, 0, nullptr,
-										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		m_RootSignatures["shadow"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
-	// defered rendering g-buffer pass root signature
-	{
-		CD3DX12_DESCRIPTOR_RANGE descriptorRanges[] =
-			{
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0}, // albedo
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0}, // normal
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0}, // metalness
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3, 0}, // roughness
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 4, 0}, // irmap, spmap, lut
-			};
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[8];
-		slotRootParameter[0].InitAsConstantBufferView(0);
-		slotRootParameter[1].InitAsConstantBufferView(1);
-		slotRootParameter[2].InitAsConstantBufferView(2);
-		slotRootParameter[3].InitAsDescriptorTable(1, &descriptorRanges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[4].InitAsDescriptorTable(1, &descriptorRanges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[5].InitAsDescriptorTable(1, &descriptorRanges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[6].InitAsDescriptorTable(1, &descriptorRanges[3], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[7].InitAsDescriptorTable(1, &descriptorRanges[4], D3D12_SHADER_VISIBILITY_PIXEL);
-
-		CD3DX12_STATIC_SAMPLER_DESC defaultSamplerDesc{0, D3D12_FILTER_ANISOTROPIC};
-		defaultSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		CD3DX12_STATIC_SAMPLER_DESC spBRDF_SamplerDesc{1, D3D12_FILTER_MIN_MAG_MIP_LINEAR};
-		spBRDF_SamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		spBRDF_SamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		spBRDF_SamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-		D3D12_STATIC_SAMPLER_DESC samplers[2] = {defaultSamplerDesc, spBRDF_SamplerDesc};
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(8, slotRootParameter, 2, samplers,
-										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		m_RootSignatures["gbuffer"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
 	// defered rendering lighting pass 0 root signature
 	{
 		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
@@ -252,19 +166,6 @@ void PipelineStateManager::BuildRootSignatures()
 		m_RootSignatures["deferredRenderingLightingPass1"] = Utils::CreateRootSignature(m_Device, desc);
 	}
 
-	// velocity buffer
-	{
-		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-		slotRootParameter[0].InitAsConstantBufferView(0);
-		slotRootParameter[1].InitAsConstantBufferView(1);
-		slotRootParameter[2].InitAsConstantBufferView(2);
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter,
-										 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		m_RootSignatures["velocityBuffer"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
 	// debug
 	{
 		CD3DX12_DESCRIPTOR_RANGE descriptorRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0};
@@ -280,117 +181,6 @@ void PipelineStateManager::BuildRootSignatures()
 										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		m_RootSignatures["debug"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
-	// voxelizer
-	{
-		CD3DX12_DESCRIPTOR_RANGE descriptorRanges[] =
-			{
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0}, // albedo
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0}, // normal
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0}, // metalness
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3, 0}, // roughness
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 4, 0}, // shadow map
-				{D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0}, // volume texture albedo
-			};
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[11];
-		slotRootParameter[0].InitAsConstantBufferView(0); // per object cb
-		slotRootParameter[1].InitAsConstantBufferView(1); // per pass cb
-		slotRootParameter[2].InitAsConstantBufferView(2); // material cb
-		slotRootParameter[3].InitAsDescriptorTable(1, &descriptorRanges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[4].InitAsDescriptorTable(1, &descriptorRanges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[5].InitAsDescriptorTable(1, &descriptorRanges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[6].InitAsDescriptorTable(1, &descriptorRanges[3], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[7].InitAsDescriptorTable(1, &descriptorRanges[4], D3D12_SHADER_VISIBILITY_PIXEL);
-		slotRootParameter[8].InitAsShaderResourceView(5); // light data
-		slotRootParameter[9].InitAsConstantBufferView(3); // shadow cb
-		slotRootParameter[10].InitAsDescriptorTable(1, &descriptorRanges[5], D3D12_SHADER_VISIBILITY_PIXEL);
-
-		CD3DX12_STATIC_SAMPLER_DESC defaultSamplerDesc{0, D3D12_FILTER_ANISOTROPIC};
-		defaultSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		CD3DX12_STATIC_SAMPLER_DESC spBRDF_SamplerDesc{1, D3D12_FILTER_MIN_MAG_MIP_LINEAR};
-		spBRDF_SamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		spBRDF_SamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		spBRDF_SamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		CD3DX12_STATIC_SAMPLER_DESC shadow(
-			2,										   // shaderRegister
-			D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT, // filter
-			D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressU
-			D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressV
-			D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressW
-			0.0f,									   // mipLODBias
-			16,										   // maxAnisotropy
-			D3D12_COMPARISON_FUNC_LESS_EQUAL,
-			D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
-		CD3DX12_STATIC_SAMPLER_DESC pointSamplerDesc(
-			3,								  // shaderRegister
-			D3D12_FILTER_MIN_MAG_MIP_POINT,	  // filter
-			D3D12_TEXTURE_ADDRESS_MODE_CLAMP, // addressU
-			D3D12_TEXTURE_ADDRESS_MODE_CLAMP  // addressV
-		);
-
-		D3D12_STATIC_SAMPLER_DESC samplers[4] = {defaultSamplerDesc, spBRDF_SamplerDesc, shadow, pointSamplerDesc};
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(11, slotRootParameter, 4, samplers,
-										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		m_RootSignatures["voxelize"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
-	// debug voxel
-	{
-		CD3DX12_DESCRIPTOR_RANGE descriptorRanges[] =
-			{
-				{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0}, // volume texture albedo
-			};
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-		slotRootParameter[0].InitAsConstantBufferView(0);
-		slotRootParameter[1].InitAsDescriptorTable(1, &descriptorRanges[0], D3D12_SHADER_VISIBILITY_ALL);
-		slotRootParameter[2].InitAsConstants(1, 1);
-
-		CD3DX12_STATIC_SAMPLER_DESC linearSampler{0, D3D12_FILTER_MIN_MAG_MIP_LINEAR};
-		linearSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		linearSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		linearSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(3, slotRootParameter, 1, &linearSampler,
-										 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		m_RootSignatures["voxelDebug"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
-	// clear voxel
-	{
-		CD3DX12_DESCRIPTOR_RANGE uavTable;
-		uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0);
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[1];
-		slotRootParameter[0].InitAsDescriptorTable(1, &uavTable);
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(1, slotRootParameter,
-										 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
-
-		m_RootSignatures["clearVoxel"] = Utils::CreateRootSignature(m_Device, desc);
-	}
-
-	// voxel mipmap
-	{
-		CD3DX12_DESCRIPTOR_RANGE descriptorRanges[] =
-			{
-				{D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0}, // previous mip
-				{D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1, 0}, // current mip
-			};
-
-		CD3DX12_ROOT_PARAMETER slotRootParameter[2];
-		slotRootParameter[0].InitAsDescriptorTable(1, &descriptorRanges[0]);
-		slotRootParameter[1].InitAsDescriptorTable(1, &descriptorRanges[1]);
-
-		CD3DX12_ROOT_SIGNATURE_DESC desc(2, slotRootParameter,
-										 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
-
-		m_RootSignatures["voxelMipmap"] = Utils::CreateRootSignature(m_Device, desc);
 	}
 }
 
@@ -449,23 +239,6 @@ void PipelineStateManager::BuildPSOs()
 
 			forwardRenderingDesc.BlendState.RenderTarget[0] = blendDesc;
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&forwardRenderingDesc, IID_PPV_ARGS(&m_PSOs["forwardRenderingTransparent"])));
-		}
-
-		// defered rendering g-buffer pass
-		{
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC gbufferDesc = desc;
-			gbufferDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
-			gbufferDesc.pRootSignature = m_RootSignatures["gbuffer"].Get();
-			gbufferDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSByteCodes["default"]->GetBufferPointer(), m_VSByteCodes["default"]->GetBufferSize());
-			gbufferDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSByteCodes["gbuffer"]->GetBufferPointer(), m_PSByteCodes["gbuffer"]->GetBufferSize());
-			gbufferDesc.NumRenderTargets = 5;
-			gbufferDesc.RTVFormats[0] = GBUFFER_ALBEDO_FORMAT;
-			gbufferDesc.RTVFormats[1] = GBUFFER_NORMAL_FORMAT;
-			gbufferDesc.RTVFormats[2] = GBUFFER_METALNESS_FORMAT;
-			gbufferDesc.RTVFormats[3] = GBUFFER_ROUGHNESS_FORMAT;
-			gbufferDesc.RTVFormats[4] = GBUFFER_AMBIENT_FORMAT;
-
-			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&gbufferDesc, IID_PPV_ARGS(&m_PSOs["gbuffer"])));
 		}
 
 		// defered rendering ambient light pass
@@ -566,149 +339,4 @@ void PipelineStateManager::BuildPSOs()
 			ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&drawNormalDesc, IID_PPV_ARGS(&m_PSOs["drawNormal"])));
 		}
 	}
-
-	// clear voxel
-	{
-		Shader byteCode = Utils::CompileShader(L"shaders\\clearVoxel.hlsl", nullptr, L"main", L"cs_6_6");
-
-		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.pRootSignature = m_RootSignatures["clearVoxel"].Get();
-		psoDesc.CS = CD3DX12_SHADER_BYTECODE(byteCode->GetBufferPointer(), byteCode->GetBufferSize());
-		ThrowIfFailed(m_Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["clearVoxel"])));
-	}
-
-	// voxelizer
-	{
-		Shader voxelVS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"VS", L"vs_6_6");
-		Shader voxelGS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"GS", L"gs_6_6");
-		Shader voxelPS = Utils::CompileShader(L"shaders\\voxelize.hlsl", nullptr, L"PS", L"ps_6_6");
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC voxelizeDesc = {};
-		voxelizeDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		voxelizeDesc.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON;
-		voxelizeDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-		voxelizeDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		voxelizeDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-		voxelizeDesc.DepthStencilState.DepthEnable = false;
-		voxelizeDesc.SampleMask = UINT_MAX;
-		voxelizeDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		voxelizeDesc.NumRenderTargets = 0;
-		voxelizeDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
-		voxelizeDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		voxelizeDesc.SampleDesc = {1, 0};
-		voxelizeDesc.InputLayout = {m_InputLayouts["default"].data(), (UINT)m_InputLayouts["default"].size()};
-		voxelizeDesc.pRootSignature = m_RootSignatures["voxelize"].Get();
-		voxelizeDesc.VS = CD3DX12_SHADER_BYTECODE(voxelVS->GetBufferPointer(), voxelVS->GetBufferSize());
-		voxelizeDesc.GS = CD3DX12_SHADER_BYTECODE(voxelGS->GetBufferPointer(), voxelGS->GetBufferSize());
-		voxelizeDesc.PS = CD3DX12_SHADER_BYTECODE(voxelPS->GetBufferPointer(), voxelPS->GetBufferSize());
-
-		ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&voxelizeDesc, IID_PPV_ARGS(&m_PSOs["voxelize"])));
-	}
-
-	// debug voxel
-	{
-		Shader voxelVS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"VS", L"vs_6_6");
-		Shader voxelGS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"GS", L"gs_6_6");
-		Shader voxelPS = Utils::CompileShader(L"shaders\\voxelDebug.hlsl", nullptr, L"PS", L"ps_6_6");
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC voxelizeDesc = {};
-		voxelizeDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		// voxelizeDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-		voxelizeDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-		voxelizeDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		voxelizeDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-		voxelizeDesc.SampleMask = UINT_MAX;
-		voxelizeDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-		voxelizeDesc.NumRenderTargets = 1;
-		voxelizeDesc.RTVFormats[0] = BACK_BUFFER_FORMAT;
-		voxelizeDesc.DSVFormat = DEPTH_STENCIL_FORMAT;
-		voxelizeDesc.SampleDesc = {1, 0};
-		voxelizeDesc.pRootSignature = m_RootSignatures["voxelDebug"].Get();
-		voxelizeDesc.VS = CD3DX12_SHADER_BYTECODE(voxelVS->GetBufferPointer(), voxelVS->GetBufferSize());
-		voxelizeDesc.GS = CD3DX12_SHADER_BYTECODE(voxelGS->GetBufferPointer(), voxelGS->GetBufferSize());
-		voxelizeDesc.PS = CD3DX12_SHADER_BYTECODE(voxelPS->GetBufferPointer(), voxelPS->GetBufferSize());
-
-		ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&voxelizeDesc, IID_PPV_ARGS(&m_PSOs["voxelDebug"])));
-	}
-
-	// voxel mipmap
-	{
-		Shader shader = Utils::CompileShader(L"shaders\\voxelMipmap.hlsl", nullptr, L"main", L"cs_6_6");
-
-		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.pRootSignature = m_RootSignatures["voxelMipmap"].Get();
-		psoDesc.CS = CD3DX12_SHADER_BYTECODE(shader->GetBufferPointer(), shader->GetBufferSize());
-		ThrowIfFailed(m_Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["voxelMipmap"])));
-	}
-
-	// voxel compute average
-	{
-		Shader shader = Utils::CompileShader(L"shaders\\voxelComputeAverage.hlsl", nullptr, L"main", L"cs_6_6");
-
-		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.pRootSignature = m_RootSignatures["voxelMipmap"].Get();
-		psoDesc.CS = CD3DX12_SHADER_BYTECODE(shader->GetBufferPointer(), shader->GetBufferSize());
-		ThrowIfFailed(m_Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_PSOs["voxelComputeAverage"])));
-	}
-}
-
-std::vector<CD3DX12_STATIC_SAMPLER_DESC> PipelineStateManager::GetStaticSamplers()
-{
-	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
-		0,								  // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT,	  // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
-
-	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
-		1,								   // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT,	   // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
-
-	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
-		2,								  // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR,  // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
-
-	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
-		3,								   // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR,   // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
-
-	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
-		4,								  // shaderRegister
-		D3D12_FILTER_ANISOTROPIC,		  // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
-
-	const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
-		5,								   // shaderRegister
-		D3D12_FILTER_ANISOTROPIC,		   // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
-
-	CD3DX12_STATIC_SAMPLER_DESC shadow(
-		6,										   // shaderRegister
-		D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,		   // addressW
-		0.0f,									   // mipLODBias
-		16,										   // maxAnisotropy
-		D3D12_COMPARISON_FUNC_LESS_EQUAL,
-		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
-
-	return {pointWrap, pointClamp,
-			linearWrap, linearClamp,
-			anisotropicWrap, anisotropicClamp,
-			shadow};
 }
