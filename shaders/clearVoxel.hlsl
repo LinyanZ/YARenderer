@@ -14,4 +14,5 @@ void main(uint3 ThreadID : SV_DispatchThreadID)
 {
     RWStructuredBuffer<Voxel> voxels = ResourceDescriptorHeap[g_Resources.VoxelIndex];
     voxels[Flatten(ThreadID, VOXEL_DIMENSION)].Radiance = 0;
+    voxels[Flatten(ThreadID, VOXEL_DIMENSION)].Normal = 0;
 }

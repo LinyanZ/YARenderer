@@ -11,6 +11,7 @@ struct VXGISettings
 {
 	bool Enable = true;
 	bool DynamicUpdate = true;
+	bool SecondBounce = true;
 	bool DebugVoxel = false;
 	int DebugVoxelMipLevel = 0;
 };

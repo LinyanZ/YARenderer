@@ -8,6 +8,7 @@
 struct Voxel
 {
     UINT64 Radiance;
+    UINT64 Normal;
 };
 
 class VXGI
@@ -20,12 +21,14 @@ public:
     D3D12_RECT &GetScissorRect() { return m_ScissorRect; }
 
     Descriptor &GetVoxelBufferUav() { return m_VoxelBufferUav; }
-    Descriptor &GetTextureSrv() { return m_TextureSrv; }
+    Descriptor &GetTextureSrv(int i) { return m_TextureSrv[i]; }
 
     void BufferToTexture3D(GraphicsCommandList commandList);
-    void GenVoxelMipmap(GraphicsCommandList commandList);
 
 private:
+    void GenVoxelMipmap(GraphicsCommandList commandList, int index);
+    void ComputeSecondBound(GraphicsCommandList commandList);
+
     void BuildResources();
     void BuildDescriptors();
 
@@ -35,11 +38,11 @@ private:
     Resource m_VoxelBuffer = nullptr;
     Descriptor m_VoxelBufferUav;
 
-    Resource m_VolumeTexture = nullptr;
+    Resource m_VolumeTexture[2];
     DXGI_FORMAT m_TextureFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     UINT m_MipLevels = 0;
 
-    Descriptor m_TextureSrv;
+    Descriptor m_TextureSrv[2];
     std::vector<Descriptor> m_TextureUav;
 
     UINT m_X = -1, m_Y = -1, m_Z = -1;

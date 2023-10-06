@@ -170,7 +170,7 @@ void GS(triangle GeometryInOut input[3], inout TriangleStream<GeometryInOut> tri
         output[i].PositionH.xy /= VOXEL_DIMENSION;
         output[i].PositionH.zw = 1;
         
-        output[i].PositionW = input[i].PositionW / VOXEL_DIMENSION / VOXEL_GRID_SIZE;
+        output[i].PositionW = input[i].PositionW;
         output[i].PositionV = input[i].PositionV;
         output[i].NormalW = input[i].NormalW;
         output[i].NormalV = input[i].NormalV;
@@ -194,10 +194,11 @@ void PS(GeometryInOut pin)
     float metalness = GetMetalness(pin.TexCoord);
     float roughness = GetRoughness(pin.TexCoord);
     
+    float3 positionW = pin.PositionW / VOXEL_DIMENSION / VOXEL_GRID_SIZE;
     uint3 texIndex = uint3(
-        (pin.PositionW.x * 0.5 + 0.5f) * VOXEL_DIMENSION,
-        (pin.PositionW.y * -0.5 + 0.5f) * VOXEL_DIMENSION,
-        (pin.PositionW.z * 0.5 + 0.5f) * VOXEL_DIMENSION
+        (positionW.x * 0.5 + 0.5f) * VOXEL_DIMENSION,
+        (positionW.y * -0.5 + 0.5f) * VOXEL_DIMENSION,
+        (positionW.z * 0.5 + 0.5f) * VOXEL_DIMENSION
     );    
     
     if (all(texIndex < VOXEL_DIMENSION) && all(texIndex >= 0))
@@ -255,6 +256,7 @@ void PS(GeometryInOut pin)
         
         uint voxelIndex = Flatten(texIndex, VOXEL_DIMENSION);
         InterlockedAdd(voxels[voxelIndex].Radiance, ConvFloat4ToUINT64(float4(directLighting * 50.0, alpha * 255.0)));
+        InterlockedAdd(voxels[voxelIndex].Normal, ConvFloat4ToUINT64(float4(pin.NormalW * 50.0, 1)));
         // ImageAtomicUINT64Avg(voxels, Flatten(texIndex), float4(directLighting, alpha));
     }
 }

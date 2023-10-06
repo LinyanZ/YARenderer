@@ -20,7 +20,7 @@ void main(uint3 texCoord : SV_DispatchThreadID)
     float4 color = ConvUINT64ToFloat4(buffer[bufferIndex].Radiance);
     
     // reset buffer
-    buffer[bufferIndex].Radiance = 0;
+    // buffer[bufferIndex].Radiance = 0;
 
     if (color.a <= 0)
     {

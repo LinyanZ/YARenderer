@@ -60,6 +60,7 @@ struct ShadowData
 struct Voxel
 {
     uint64_t Radiance;
+    uint64_t Normal;
 };
 
 #endif // __STRUCTS_HLSL__

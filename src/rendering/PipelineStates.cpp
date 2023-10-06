@@ -264,6 +264,16 @@ void PipelineStates::BuildPSOs(Device device)
         desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
         ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelMipmap"])));
     }
+
+    // voxel second bounce
+    {
+        Shader CS = Utils::CompileShader(L"shaders\\voxelSecondBounce.hlsl", nullptr, L"main", L"cs_6_6");
+
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+        desc.pRootSignature = m_RootSignature.Get();
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelSecondBounce"])));
+    }
 }
 
 std::vector<CD3DX12_STATIC_SAMPLER_DESC> PipelineStates::GetStaticSamplers()

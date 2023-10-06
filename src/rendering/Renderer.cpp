@@ -504,7 +504,7 @@ void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
 						m_GBufferAmbient.Srv.Index,
 						m_DxContext->DepthStencilBuffer().Srv.Index,
 						m_CascadedShadowMap->Srv(4).Index,
-						m_VXGI->GetTextureSrv().Index};
+						m_VXGI->GetTextureSrv(g_RenderingSettings.GI.SecondBounce ? 1 : 0).Index};
 
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
 
@@ -625,7 +625,6 @@ void Renderer::VoxelizeScene(GraphicsCommandList commandList)
 	DrawRenderItems(commandList, false);
 
 	m_VXGI->BufferToTexture3D(commandList);
-	m_VXGI->GenVoxelMipmap(commandList);
 }
 
 void Renderer::DebugVoxel(GraphicsCommandList commandList)
@@ -639,7 +638,7 @@ void Renderer::DebugVoxel(GraphicsCommandList commandList)
 	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
 	commandList->SetPipelineState(PipelineStates::GetPSO("voxelDebug"));
 
-	UINT resources[] = {m_VXGI->GetTextureSrv().Index, static_cast<UINT>(g_RenderingSettings.GI.DebugVoxelMipLevel)};
+	UINT resources[] = {m_VXGI->GetTextureSrv(g_RenderingSettings.GI.SecondBounce ? 1 : 0).Index, static_cast<UINT>(g_RenderingSettings.GI.DebugVoxelMipLevel)};
 	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
 
 	UINT dimension = VOXEL_DIMENSION / pow(2, g_RenderingSettings.GI.DebugVoxelMipLevel);

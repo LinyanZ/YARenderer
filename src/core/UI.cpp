@@ -110,6 +110,7 @@ void UI::Render()
         {
             ImGui::Checkbox("Enable GI", &g_RenderingSettings.GI.Enable);
             ImGui::Checkbox("Dynamic Update", &g_RenderingSettings.GI.DynamicUpdate);
+            ImGui::Checkbox("Second Bounce", &g_RenderingSettings.GI.SecondBounce);
             ImGui::Checkbox("Debug Voxel", &g_RenderingSettings.GI.DebugVoxel);
             ImGui::SliderInt("Debug Voxel Mip Level", &g_RenderingSettings.GI.DebugVoxelMipLevel, 0, 7);
 

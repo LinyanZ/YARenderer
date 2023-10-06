@@ -10,11 +10,12 @@ VXGI::VXGI(Ref<DxContext> dxContext, UINT size)
     m_MipLevels = 1;
     while (size >> m_MipLevels)
         m_MipLevels++;
-    m_TextureUav.resize(m_MipLevels);
+    m_TextureUav.resize(m_MipLevels * 2);
 
     // allocate descriptors
-    m_TextureSrv = dxContext->GetCbvSrvUavHeap().Alloc();
-    for (int i = 0; i < m_MipLevels; i++)
+    m_TextureSrv[0] = dxContext->GetCbvSrvUavHeap().Alloc();
+    m_TextureSrv[1] = dxContext->GetCbvSrvUavHeap().Alloc();
+    for (int i = 0; i < m_MipLevels * 2; i++)
         m_TextureUav[i] = dxContext->GetCbvSrvUavHeap().Alloc();
 
     m_VoxelBufferUav = dxContext->GetCbvSrvUavHeap().Alloc();
@@ -62,15 +63,25 @@ void VXGI::BufferToTexture3D(GraphicsCommandList commandList)
 
     UINT groupSize = std::max(VOXEL_DIMENSION / 8, 1);
     commandList->Dispatch(groupSize, groupSize, groupSize);
+
+    // generate mipmap for the first texture
+    GenVoxelMipmap(commandList, 0);
+
+    // write the second bounce color to the second texture
+    ComputeSecondBound(commandList);
+
+    // generate mipmap for the second texture
+    GenVoxelMipmap(commandList, 1);
 }
 
-void VXGI::GenVoxelMipmap(GraphicsCommandList commandList)
+void VXGI::GenVoxelMipmap(GraphicsCommandList commandList, int index)
 {
     commandList->SetPipelineState(PipelineStates::GetPSO("voxelMipmap"));
 
     for (int i = 1, levelWidth = VOXEL_DIMENSION / 2; i < m_MipLevels; i++, levelWidth /= 2)
     {
-        UINT resources[] = {m_TextureUav[i - 1].Index, m_TextureUav[i].Index};
+        UINT resources[] = {m_TextureUav[index * m_MipLevels + i - 1].Index,
+                            m_TextureUav[index * m_MipLevels + i].Index};
         commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, 2, resources, 0);
 
         UINT count = std::max(levelWidth / 8, 1);
@@ -78,10 +89,21 @@ void VXGI::GenVoxelMipmap(GraphicsCommandList commandList)
     }
 }
 
+void VXGI::ComputeSecondBound(GraphicsCommandList commandList)
+{
+    UINT resources[] = {m_VoxelBufferUav.Index,
+                        m_TextureSrv[0].Index,
+                        m_TextureUav[m_MipLevels].Index}; // second 3d texture uav (first mip level)
+
+    commandList->SetPipelineState(PipelineStates::GetPSO("voxelSecondBounce"));
+    commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
+
+    UINT groupSize = std::max(VOXEL_DIMENSION / 8, 1);
+    commandList->Dispatch(groupSize, groupSize, groupSize);
+}
+
 void VXGI::BuildResources()
 {
-    m_VolumeTexture = nullptr;
-
     D3D12_RESOURCE_DESC texDesc = {};
     texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
     texDesc.Alignment = 0;
@@ -94,13 +116,18 @@ void VXGI::BuildResources()
     texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-    ThrowIfFailed(m_Device->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-        D3D12_HEAP_FLAG_NONE,
-        &texDesc,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-        nullptr,
-        IID_PPV_ARGS(m_VolumeTexture.GetAddressOf())));
+    for (int i = 0; i < 2; i++)
+    {
+        m_VolumeTexture[i] = nullptr;
+
+        ThrowIfFailed(m_Device->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &texDesc,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            IID_PPV_ARGS(m_VolumeTexture[i].GetAddressOf())));
+    }
 
     UINT byteSize = (m_X * m_Y * m_Z) * sizeof(Voxel);
     ThrowIfFailed(m_Device->CreateCommittedResource(
@@ -122,17 +149,18 @@ void VXGI::BuildDescriptors()
     srvDesc.Texture3D.MipLevels = m_MipLevels;
     srvDesc.Texture3D.ResourceMinLODClamp = 0.0f;
 
-    m_Device->CreateShaderResourceView(m_VolumeTexture.Get(), &srvDesc, m_TextureSrv.CPUHandle);
+    m_Device->CreateShaderResourceView(m_VolumeTexture[0].Get(), &srvDesc, m_TextureSrv[0].CPUHandle);
+    m_Device->CreateShaderResourceView(m_VolumeTexture[1].Get(), &srvDesc, m_TextureSrv[1].CPUHandle);
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.Format = m_TextureFormat;
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
     uavDesc.Texture3D.FirstWSlice = 0;
     uavDesc.Texture3D.WSize = -1;
-    for (int i = 0; i < m_MipLevels; i++)
+    for (int i = 0; i < m_MipLevels * 2; i++)
     {
-        uavDesc.Texture3D.MipSlice = i;
-        m_Device->CreateUnorderedAccessView(m_VolumeTexture.Get(), nullptr, &uavDesc, m_TextureUav[i].CPUHandle);
+        uavDesc.Texture3D.MipSlice = i % m_MipLevels;
+        m_Device->CreateUnorderedAccessView(m_VolumeTexture[i / m_MipLevels].Get(), nullptr, &uavDesc, m_TextureUav[i].CPUHandle);
     }
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC voxelUavDesc{};

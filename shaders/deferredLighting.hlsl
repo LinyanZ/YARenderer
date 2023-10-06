@@ -133,7 +133,7 @@ float4 PS(VertexOut pin) : SV_Target
         float4 specularIndirectColor = TraceSpecularCone(voxels, g_SamplerLinearClamp, positionW, normalW, V, roughness);
         
         ambient += diffuseIndirectColor.rgb;
-        ambient += specularIndirectColor.rgb;
+        // ambient += specularIndirectColor.rgb;
     }
 
     return float4(directLighting + ambient * albedo, alpha);
