@@ -71,9 +71,10 @@ void UI::Render()
 
     ImGui::PushItemWidth(-200);
 
-    if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Checkbox("VSync", &g_RenderingSettings.EnableVSync);
+        ImGui::Checkbox("Enable IBL", &g_RenderingSettings.EnableIBL);
     }
 
     if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen))

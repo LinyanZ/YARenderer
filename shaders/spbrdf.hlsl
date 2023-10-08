@@ -3,11 +3,18 @@
 static const uint NumSamples = 1024;
 static const float InvNumSamples = 1.0 / float(NumSamples);
 
-RWTexture2D<float2> LUT : register(u0);
+struct Resources
+{
+    uint OutputTexIndex;
+};
+
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 [numthreads(32, 32, 1)]
 void main(uint2 ThreadID : SV_DispatchThreadID)
 {
+	RWTexture2D<float2> LUT = ResourceDescriptorHeap[g_Resources.OutputTexIndex];
+
 	// Get output LUT dimensions.
 	float outputWidth, outputHeight;
 	LUT.GetDimensions(outputWidth, outputHeight);
@@ -34,7 +41,7 @@ void main(uint2 ThreadID : SV_DispatchThreadID)
 		// Sample directly in tangent/shading space since we don't care about reference frame as long as it's consistent.
 		float3 H = SampleGGX(uv.x, uv.y, roughness);
 
-		// Compute incident direction (Li) by reflecting viewing direction (Lo) around half-vector (Lh).
+		// Compute incident direction (L) by reflecting viewing direction (V) around half-vector (H).
 		float3 L = 2.0 * dot(V, H) * H - V;
 
 		float NdotL = L.z;

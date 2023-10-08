@@ -20,6 +20,7 @@ struct RenderingSettings
 {
 	// Display Settings
 	bool EnableVSync = false;
+	bool EnableIBL = false;
 
 	// Shadow Settings
 	float MaxShadowDistance = 100.f;

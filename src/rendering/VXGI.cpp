@@ -96,7 +96,7 @@ void VXGI::ComputeSecondBound(GraphicsCommandList commandList)
                         m_TextureUav[m_MipLevels].Index}; // second 3d texture uav (first mip level)
 
     commandList->SetPipelineState(PipelineStates::GetPSO("voxelSecondBounce"));
-    commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
+    commandList->SetComputeRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources) / sizeof(UINT), resources, 0);
 
     UINT groupSize = std::max(VOXEL_DIMENSION / 8, 1);
     commandList->Dispatch(groupSize, groupSize, groupSize);

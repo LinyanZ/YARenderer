@@ -70,9 +70,6 @@ set(SRC_FILES
     src/rendering/Mesh.h
     src/rendering/Mesh.cpp
 
-    src/rendering/PipelineStateManager.h
-    src/rendering/PipelineStateManager.cpp
-
     src/rendering/Renderer.h
     src/rendering/Renderer.cpp
 

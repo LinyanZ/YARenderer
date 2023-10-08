@@ -43,7 +43,7 @@ void TAA::Render(GraphicsCommandList commandList, Texture &velocityBuffer)
 			m_DxContext->DepthStencilBuffer().Srv.Index,
 			velocityBuffer.Srv.Index};
 
-		commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
+		commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources) / sizeof(UINT), resources, 0);
 
 		commandList->DrawInstanced(3, 1, 0, 0);
 	}

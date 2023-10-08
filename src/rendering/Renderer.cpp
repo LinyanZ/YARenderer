@@ -15,10 +15,8 @@ Renderer::Renderer(Ref<DxContext> dxContext, UINT width, UINT height)
 	for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; ++i)
 		m_FrameResources.push_back(std::make_unique<FrameResource>(dxContext->GetDevice(), passCount, objectCount, materialCount, lightCount));
 
-	RenderingUtils::Init(dxContext);
 	PipelineStates::Init(dxContext->GetDevice());
 
-	m_PipelineStateManager = std::make_unique<PipelineStateManager>(dxContext->GetDevice());
 	m_EnvironmentMap = std::make_unique<EnvironmentMap>(dxContext);
 	m_CascadedShadowMap = std::make_unique<CascadedShadowMap>(dxContext);
 	m_PostProcessing = std::make_unique<PostProcessing>(dxContext, width, height);
@@ -129,7 +127,7 @@ void Renderer::Render()
 
 	commandList->SetGraphicsRootSignature(PipelineStates::GetRootSignature());
 
-	// set pass constant buffer
+	// bind pass constant buffer
 	auto passCB = CurrFrameResource()->PassCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::PassCB, passCB->GetGPUVirtualAddress());
 
@@ -137,16 +135,18 @@ void Renderer::Render()
 	auto lightCB = CurrFrameResource()->LightBuffer->GetResource();
 	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::LightCB, lightCB->GetGPUVirtualAddress());
 
-	// set shadow constant buffer
+	// bind shadow constant buffer
 	auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
 	commandList->SetGraphicsRootConstantBufferView((UINT)RootParam::ShadowCB, shadowCB->GetGPUVirtualAddress());
 
 	// cascaded shadow from directional light
 	ShadowMapPass(commandList);
 
+	// reset taa so that it won't use outdated information
 	if (g_RenderingSettings.GI.DebugVoxel || g_RenderingSettings.AntialisingMethod != Antialising::TAA)
 		m_TAA->Reset();
 
+	// re-voxelize the whole scene if required
 	if (g_RenderingSettings.GI.DynamicUpdate)
 	{
 		commandList->SetComputeRootSignature(PipelineStates::GetRootSignature());
@@ -174,16 +174,7 @@ void Renderer::Render()
 		m_PostProcessing->Render(commandList, m_DxContext->CurrentBackBuffer(), m_GBufferVelocity);
 	}
 
-	// Debug(commandList, m_GBufferAlbedo.Srv, 0);
-	// Debug(commandList, m_GBufferNormal.Srv, 1);
-	// Debug(commandList, m_GBufferMetalness.Srv, 2);
-	// Debug(commandList, m_GBufferRoughness.Srv, 3);
-	// Debug(commandList, m_GBufferAmbient.Srv, 4);
-	// Debug(commandList, m_GBufferVelocity.Srv, 5);
-	// Debug(commandList, m_CascadedShadowMap->Srv(0), 12);
-	// Debug(commandList, m_CascadedShadowMap->Srv(1), 13);
-	// Debug(commandList, m_CascadedShadowMap->Srv(2), 14);
-	// Debug(commandList, m_CascadedShadowMap->Srv(3), 15);
+	// Debug(commandList, m_EnvironmentMap->GetBRDFLUT().Srv, 0);
 }
 
 void Renderer::EndFrame()
@@ -248,14 +239,12 @@ void Renderer::BuildRenderItems()
 
 #if TEST_SCENE
 	Ref<RenderItem> testScene = std::make_shared<RenderItem>();
-	// testScene->Mesh = Mesh::FromFile("resources/meshes/test_scene2.gltf");
 	testScene->Mesh = Mesh::FromFile("resources/low_poly_winter_scene/scene.gltf");
 	testScene->Mesh->UploadVertexAndIndexBufferToGPU(device, commandList);
 	testScene->Mesh->LoadTextures(device, commandList, cbvSrvUavHeap);
 	testScene->objCBIndex = 0;
 	testScene->matCBIndex = 0;
 	m_RenderItems.push_back(testScene);
-
 #endif
 
 #if SPONZA_SCENE
@@ -285,84 +274,6 @@ void Renderer::BuildRenderItems()
 //
 // Rendering
 //
-
-void Renderer::ForwardRendering(GraphicsCommandList commandList)
-{
-	// commandList->RSSetViewports(1, &m_ScreenViewport);
-	// commandList->RSSetScissorRects(1, &m_ScissorRect);
-
-	// DrawNormalsAndDepth(commandList);
-	// m_SSAO->ComputeSSAO(commandList.Get(), m_GBufferNormal, m_DxContext->DepthStencilBuffer().Srv, CurrFrameResource(), 3);
-
-	// // SSAO is rendered at half of the render target size, so reset to fullscreen size.
-	// commandList->RSSetViewports(1, &m_ScreenViewport);
-	// commandList->RSSetScissorRects(1, &m_ScissorRect);
-
-	// // Clear the background
-	// // commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, XMVECTORF32{ 0.0f, 0.0f, 0.0f, 1.0f }, 0, nullptr);
-	// commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-	// // Specify the buffers we are going to render to.
-	// commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
-
-	// // Set the root signature for forward rendering
-	// commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("forwardRendering").Get());
-
-	// // Bind pass constant buffer
-	// auto passCB = CurrFrameResource()->PassCB->GetResource();
-	// commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-	// // Bind IBL textures
-	// commandList->SetGraphicsRootDescriptorTable(7, m_EnvironmentMap->GetIrMap().Srv.GPUHandle);
-
-	// // Bind SSAO map
-	// commandList->SetGraphicsRootDescriptorTable(8, m_SSAO->AmbientMap().Srv.GPUHandle);
-
-	// // Bind Shadow map
-	// commandList->SetGraphicsRootDescriptorTable(9, m_CascadedShadowMap->Srv(4).GPUHandle);
-
-	// // Bind lighting data
-	// auto lightingDataBuffer = CurrFrameResource()->LightBuffer->GetResource();
-	// commandList->SetGraphicsRootShaderResourceView(10, lightingDataBuffer->GetGPUVirtualAddress());
-
-	// // Bind cascade shadow constant buffer
-	// auto shadowCB = CurrFrameResource()->ShadowCB->GetResource();
-	// commandList->SetGraphicsRootConstantBufferView(11, shadowCB->GetGPUVirtualAddress());
-
-	// commandList->SetGraphicsRootDescriptorTable(12, m_VolumeAlbedo.Srv.GPUHandle);
-
-	// // Draw Opague Objects
-	// commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRendering").Get());
-	// DrawRenderItems(commandList, false);
-
-	// // Draw transparent objects
-	// commandList->SetPipelineState(m_PipelineStateManager->GetPSO("forwardRenderingTransparent").Get());
-	// DrawRenderItems(commandList, true);
-}
-
-void Renderer::DeferredRendering(GraphicsCommandList commandList)
-{
-	ShadowMapPass(commandList);
-
-	// CascadeShadowMap is rendered at a different render target size, so reset to fullscreen size.
-	commandList->RSSetViewports(1, &m_ScreenViewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
-
-	// Store g-buffer resources (albedo, normal, metalness, roughness, ambient light)
-	GBufferPass(commandList);
-
-	m_SSAO->ComputeSSAO(commandList.Get(), m_GBufferNormal, m_DxContext->DepthStencilBuffer().Srv, CurrFrameResource(), 3);
-
-	// SSAO is rendered at half of the render target size, so reset to fullscreen size.
-	commandList->RSSetViewports(1, &m_ScreenViewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
-
-	// Draw ambient light to the back buffer, with SSAO applied.
-	AmbientLightPass(commandList);
-
-	// Additively blend direct lighting to the back buffer.
-	LightingPass(commandList);
-}
 
 void Renderer::GBufferPass(GraphicsCommandList commandList)
 {
@@ -409,90 +320,6 @@ void Renderer::GBufferPass(GraphicsCommandList commandList)
 	commandList->ResourceBarrier(6, postBarriers);
 }
 
-void Renderer::AmbientLightPass(GraphicsCommandList commandList)
-{
-	commandList->ClearRenderTargetView(m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, Colors::Black, 0, nullptr);
-	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, nullptr);
-
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("deferredAmbientLight").Get());
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("deferredAmbientLight").Get());
-
-	commandList->SetGraphicsRootDescriptorTable(0, m_GBufferAmbient.Srv.GPUHandle);
-	commandList->SetGraphicsRootDescriptorTable(1, m_SSAO->AmbientMap().Srv.GPUHandle);
-
-	commandList->DrawInstanced(3, 1, 0, 0);
-}
-
-void Renderer::LightingPass(GraphicsCommandList commandList)
-{
-	for (UINT i = 0; i < m_Lights.size(); i++)
-	{
-		if (!m_Lights[i].Enabled)
-			continue;
-
-		// Clear the stencilbuffer to 1 to mark all pixels.
-		commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 1, 0, nullptr);
-
-		// Only bind the depth/stencil buffer.
-		commandList->OMSetRenderTargets(0, nullptr, false, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
-
-		// Lighting pass 0: unmark pixels that are in front of the front faces of the light volume.
-		commandList->SetPipelineState(m_PipelineStateManager->GetPSO("deferredRenderingLightingPass0").Get());
-		commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("deferredRenderingLightingPass0").Get());
-
-		// Set light index
-		commandList->SetGraphicsRoot32BitConstant(0, i, 0);
-
-		// Set pass constant buffer
-		auto passCB = CurrFrameResource()->PassCB->GetResource();
-		commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-		// Bind lighting data
-		auto lightingDataBuffer = CurrFrameResource()->LightBuffer->GetResource();
-		commandList->SetGraphicsRootShaderResourceView(2, lightingDataBuffer->GetGPUVirtualAddress());
-
-		// Draw light geometry
-		switch (m_Lights[i].Type)
-		{
-		case Light::Type::PointLight:
-			commandList->IASetVertexBuffers(0, 1, &m_PointLightGeo->VertexBufferView());
-			commandList->IASetIndexBuffer(&m_PointLightGeo->IndexBufferView());
-
-			commandList->DrawIndexedInstanced((UINT)m_PointLightGeo->Indices().size(), 1, 0, 0, 0);
-			break;
-		case Light::Type::DirectionalLight:
-		case Light::Type::SpotLight:
-		default:
-			break;
-		}
-
-		// Lighting pass 1: shade pixels that are marked and in front of the back faces of the light volume.
-		commandList->OMSetStencilRef(1);
-		commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
-
-		commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("deferredRenderingLightingPass1").Get());
-		commandList->SetPipelineState(m_PipelineStateManager->GetPSO("deferredRenderingLightingPass1").Get());
-
-		commandList->SetGraphicsRootDescriptorTable(3, m_GBufferAlbedo.Srv.GPUHandle);
-		commandList->SetGraphicsRootDescriptorTable(4, m_DxContext->DepthStencilBuffer().Srv.GPUHandle);
-
-		// Draw light geometry
-		switch (m_Lights[i].Type)
-		{
-		case Light::Type::PointLight:
-			commandList->IASetVertexBuffers(0, 1, &m_PointLightGeo->VertexBufferView());
-			commandList->IASetIndexBuffer(&m_PointLightGeo->IndexBufferView());
-
-			commandList->DrawIndexedInstanced((UINT)m_PointLightGeo->Indices().size(), 1, 0, 0, 0);
-			break;
-		case Light::Type::DirectionalLight:
-		case Light::Type::SpotLight:
-		default:
-			break;
-		}
-	}
-}
-
 void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
 {
 	commandList->SetPipelineState(PipelineStates::GetPSO("deferredLighting"));
@@ -504,36 +331,16 @@ void Renderer::DeferredLightingPass(GraphicsCommandList commandList)
 						m_GBufferAmbient.Srv.Index,
 						m_DxContext->DepthStencilBuffer().Srv.Index,
 						m_CascadedShadowMap->Srv(4).Index,
-						m_VXGI->GetTextureSrv(g_RenderingSettings.GI.SecondBounce ? 1 : 0).Index};
+						m_VXGI->GetTextureSrv(g_RenderingSettings.GI.SecondBounce ? 1 : 0).Index,
+						m_EnvironmentMap->GetIrMap().Srv.Index,
+						m_EnvironmentMap->GetSpMap().Srv.Index,
+						m_EnvironmentMap->GetBRDFLUT().Srv.Index};
 
-	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources) / sizeof(UINT), resources, 0);
 
 	// fullscreen triangle
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->DrawInstanced(3, 1, 0, 0);
-}
-
-void Renderer::DrawNormalsAndDepth(GraphicsCommandList commandList)
-{
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(),
-																		  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-	float clearValue[] = {0.0f, 0.0f, 1.0f, 0.0f};
-	commandList->ClearRenderTargetView(m_GBufferNormal.Rtv.CPUHandle, clearValue, 0, nullptr);
-	commandList->ClearDepthStencilView(m_DxContext->DepthStencilBuffer().Dsv.CPUHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-	commandList->OMSetRenderTargets(1, &m_GBufferNormal.Rtv.CPUHandle, true, &m_DxContext->DepthStencilBuffer().Dsv.CPUHandle);
-
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("drawNormal").Get());
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("drawNormal").Get());
-
-	auto passCB = CurrFrameResource()->PassCB->GetResource();
-	commandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-	DrawRenderItems(commandList);
-
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_GBufferNormal.Resource.Get(),
-																		  D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COMMON));
 }
 
 void Renderer::DrawRenderItems(GraphicsCommandList commandList, bool transparent)
@@ -620,7 +427,7 @@ void Renderer::VoxelizeScene(GraphicsCommandList commandList)
 	commandList->SetPipelineState(PipelineStates::GetPSO("voxelize"));
 
 	UINT resources[] = {m_VXGI->GetVoxelBufferUav().Index, m_CascadedShadowMap->Srv(4).Index};
-	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources) / sizeof(UINT), resources, 0);
 
 	DrawRenderItems(commandList, false);
 
@@ -639,7 +446,7 @@ void Renderer::DebugVoxel(GraphicsCommandList commandList)
 	commandList->SetPipelineState(PipelineStates::GetPSO("voxelDebug"));
 
 	UINT resources[] = {m_VXGI->GetTextureSrv(g_RenderingSettings.GI.SecondBounce ? 1 : 0).Index, static_cast<UINT>(g_RenderingSettings.GI.DebugVoxelMipLevel)};
-	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources), resources, 0);
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources) / sizeof(UINT), resources, 0);
 
 	UINT dimension = VOXEL_DIMENSION / pow(2, g_RenderingSettings.GI.DebugVoxelMipLevel);
 
@@ -647,16 +454,17 @@ void Renderer::DebugVoxel(GraphicsCommandList commandList)
 	commandList->DrawInstanced(pow(dimension, 3), 1, 0, 0);
 }
 
-void Renderer::Debug(GraphicsCommandList commandList, Descriptor srv, int slot)
+void Renderer::Debug(GraphicsCommandList commandList, Descriptor srv, UINT slot)
 {
 	commandList->RSSetViewports(1, &m_ScreenViewport);
 	commandList->RSSetScissorRects(1, &m_ScissorRect);
+
 	commandList->OMSetRenderTargets(1, &m_DxContext->CurrentBackBuffer().Rtv.CPUHandle, true, nullptr);
 
-	commandList->SetGraphicsRootSignature(m_PipelineStateManager->GetRootSignature("debug").Get());
-	commandList->SetPipelineState(m_PipelineStateManager->GetPSO("debug").Get());
-	commandList->SetGraphicsRootDescriptorTable(0, srv.GPUHandle);
-	commandList->SetGraphicsRoot32BitConstant(1, (UINT)slot, 0);
+	commandList->SetPipelineState(PipelineStates::GetPSO("debug"));
+
+	UINT resources[] = {srv.Index, slot};
+	commandList->SetGraphicsRoot32BitConstants((UINT)RootParam::RenderResources, sizeof(resources) / sizeof(UINT), resources, 0);
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->DrawInstanced(6, 1, 0, 0);
@@ -803,6 +611,7 @@ void Renderer::UpdateMainPassConstantBuffer(Timer &timer)
 	m_MainPassCB.TotalTime = timer.TotalTime();
 	m_MainPassCB.DeltaTime = timer.DeltaTime();
 	m_MainPassCB.EnableGI = g_RenderingSettings.GI.Enable;
+	m_MainPassCB.EnableIBL = g_RenderingSettings.EnableIBL;
 
 	m_MainPassCB.Jitter = XMFLOAT2(jitterX, jitterY);
 	m_MainPassCB.PreviousJitter = XMFLOAT2(m_PreviousJitterX, m_PreviousJitterY);

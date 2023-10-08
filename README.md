@@ -40,6 +40,8 @@ The goal of this project is to learn Directx12 API and implement some common gra
 
 [Integrating Realistic Soft Shadows Into Your Game Engine (nvidia.com)](https://developer.download.nvidia.com/whitepapers/2008/PCSS_Integration.pdf)
 
+[Implementing FXAA - 2016/07/30 (simonrodriguez.fr)](http://blog.simonrodriguez.fr/articles/2016/07/implementing_fxaa.html)
+
 [Alex Tardif: Temporal Antialiasing Starter Pack](https://alextardif.com/TAA.html)
 
 [Voxel-based Global Illumination – Wicked Engine](https://wickedengine.net/2017/08/30/voxel-based-global-illumination/)

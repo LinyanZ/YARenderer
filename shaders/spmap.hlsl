@@ -1,24 +1,26 @@
 #include "utils.hlsl"
+#include "samplers.hlsl"
 
 static const uint NumSamples = 1024;
 static const float InvNumSamples = 1.0 / float(NumSamples);
 
-cbuffer SpecularMapFilterSettings : register(b0)
+struct Resources
 {
-	// Roughness value to pre-filter for.
-	float roughness;
+    uint InputTexIndex;
+    uint OutputTexIndex;
+	float Roughness;
 };
 
-TextureCube inputTexture : register(t0);
-RWTexture2DArray<float4> outputTexture : register(u0);
-
-SamplerState defaultSampler : register(s0);
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 [numthreads(32, 32, 1)]
 void main(uint3 threadID : SV_DispatchThreadID)
 {
+	TextureCube inputTex = ResourceDescriptorHeap[g_Resources.InputTexIndex];
+    RWTexture2DArray<float4> outputTex = ResourceDescriptorHeap[g_Resources.OutputTexIndex];
+
 	uint outputWidth, outputHeight, outputDepth;
-	outputTexture.GetDimensions(outputWidth, outputHeight, outputDepth);
+	outputTex.GetDimensions(outputWidth, outputHeight, outputDepth);
 	
 	// Make sure we won't write past output when computing higher mipmap levels.
 	if(threadID.x >= outputWidth || threadID.y >= outputHeight) 
@@ -26,7 +28,7 @@ void main(uint3 threadID : SV_DispatchThreadID)
 	
 	// Get input cubemap dimensions at zero mipmap level.
 	float inputWidth, inputHeight, inputLevels;
-	inputTexture.GetDimensions(0, inputWidth, inputHeight, inputLevels);
+	inputTex.GetDimensions(0, inputWidth, inputHeight, inputLevels);
 	
 	// Solid angle associated with a single cubemap texel at zero mipmap level.
     // This will come in handy for importance sampling below.
@@ -46,9 +48,9 @@ void main(uint3 threadID : SV_DispatchThreadID)
 	// Weight by cosine term since Epic claims it generally improves quality.
 	for(uint i = 0; i < NumSamples; ++i) {
 		float2 uv = SampleHammersley(i, InvNumSamples);
-		float3 H = TangentToBasis(SampleGGX(uv.x, uv.y, roughness), N, S, T);
+		float3 H = TangentToBasis(SampleGGX(uv.x, uv.y, g_Resources.Roughness), N, S, T);
 
-		// Compute incident direction (Li) by reflecting viewing direction (Lo) around half-vector (H).
+		// Compute incident direction (L) by reflecting viewing direction (V) around half-vector (H).
 		float3 L = 2.0 * dot(V, H) * H - V;
 
 		float NdotL = dot(N, L);
@@ -59,7 +61,7 @@ void main(uint3 threadID : SV_DispatchThreadID)
 
             // GGX normal distribution function (D term) probability density function.
             // Scaling by 1/4 is due to change of density in terms of Lh to Li (and since N=V, rest of the scaling factor cancels out).
-            float pdf = NDFGGX(NdotH, roughness) * 0.25;
+            float pdf = NDFGGX(NdotH, g_Resources.Roughness) * 0.25;
 
             // Solid angle associated with this sample.
             float ws = 1.0 / (NumSamples * pdf);
@@ -67,11 +69,11 @@ void main(uint3 threadID : SV_DispatchThreadID)
             // Mip level to sample from.
             float mipLevel = max(0.5 * log2(ws / wt) + 1.0, 0.0);
 
-            color += inputTexture.SampleLevel(defaultSampler, L, mipLevel).rgb * NdotL;
+            color += inputTex.SampleLevel(g_SamplerAnisotropicWrap, L, mipLevel).rgb * NdotL;
             weight += NdotL;
         }
 	}
 	color /= weight;
 
-	outputTexture[threadID] = float4(color, 1.0);
+	outputTex[threadID] = float4(color, 1.0);
 }

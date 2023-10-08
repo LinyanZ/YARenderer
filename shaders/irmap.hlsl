@@ -1,18 +1,25 @@
 #include "utils.hlsl"
+#include "samplers.hlsl"
 
 static const uint NumSamples = 64 * 1024;
 static const float InvNumSamples = 1.0 / float(NumSamples);
 
-TextureCube inputTexture : register(t0);
-RWTexture2DArray<float4> outputTexture : register(u0);
+struct Resources
+{
+    uint InputTexIndex;
+    uint OutputTexIndex;
+};
 
-SamplerState defaultSampler : register(s0);
+ConstantBuffer<Resources> g_Resources : register(b6);
 
 [numthreads(32, 32, 1)]
 void main(uint3 ThreadID : SV_DispatchThreadID)
 {
+    TextureCube inputTex = ResourceDescriptorHeap[g_Resources.InputTexIndex];
+    RWTexture2DArray<float4> outputTex = ResourceDescriptorHeap[g_Resources.OutputTexIndex];
+
     float outputWidth, outputHeight, outputDepth;
-    outputTexture.GetDimensions(outputWidth, outputHeight, outputDepth);
+    outputTex.GetDimensions(outputWidth, outputHeight, outputDepth);
     
     float3 N = GetSamplingVector(ThreadID, outputWidth, outputHeight);
 	
@@ -30,9 +37,9 @@ void main(uint3 ThreadID : SV_DispatchThreadID)
         float cosTheta = max(0.0, dot(Li, N));
 
 		// PIs here cancel out because of division by pdf.
-        irradiance += 2.0 * inputTexture.SampleLevel(defaultSampler, Li, 0).rgb * cosTheta;
+        irradiance += 2.0 * inputTex.SampleLevel(g_SamplerAnisotropicWrap, Li, 0).rgb * cosTheta;
     }
     irradiance /= float(NumSamples);
 
-    outputTexture[ThreadID] = float4(irradiance, 1.0);
+    outputTex[ThreadID] = float4(irradiance, 1.0);
 }

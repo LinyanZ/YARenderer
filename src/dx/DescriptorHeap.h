@@ -43,12 +43,12 @@ struct DescriptorHeap
 	}
 };
 
-struct DxDescriptorHeapMark
+struct DescriptorHeapMark
 {
-	DxDescriptorHeapMark(DescriptorHeap &heap)
+	DescriptorHeapMark(DescriptorHeap &heap)
 		: Heap(heap), Mark(heap.Size) {}
 
-	~DxDescriptorHeapMark()
+	~DescriptorHeapMark()
 	{
 		Heap.Size = Mark;
 	}

@@ -274,6 +274,59 @@ void PipelineStates::BuildPSOs(Device device)
         desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
         ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["voxelSecondBounce"])));
     }
+
+    // equirect to cubemap
+    {
+        Shader CS = Utils::CompileShader(L"shaders\\equirect2Cube.hlsl", nullptr, L"main", L"cs_6_6");
+
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+        desc.pRootSignature = m_RootSignature.Get();
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["equirect2Cube"])));
+    }
+
+    // ibl
+    {
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+        desc.pRootSignature = m_RootSignature.Get();
+
+        Shader CS = Utils::CompileShader(L"shaders\\irmap.hlsl", nullptr, L"main", L"cs_6_6");
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["irmap"])));
+
+        CS = Utils::CompileShader(L"shaders\\spmap.hlsl", nullptr, L"main", L"cs_6_6");
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["spmap"])));
+
+        CS = Utils::CompileShader(L"shaders\\spbrdf.hlsl", nullptr, L"main", L"cs_6_6");
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["spbrdf"])));
+    }
+
+    // mipmap
+    {
+        Shader CS = Utils::CompileShader(L"shaders\\downsample_array.hlsl", nullptr, L"downsample_linear", L"cs_6_6");
+
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+        desc.pRootSignature = m_RootSignature.Get();
+        desc.CS = CD3DX12_SHADER_BYTECODE(CS->GetBufferPointer(), CS->GetBufferSize());
+        ThrowIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_PSOs["mipmap"])));
+    }
+
+    // debug texture
+    {
+        Shader VS = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"VS", L"vs_6_6");
+        Shader PS = Utils::CompileShader(L"shaders\\debug.hlsl", nullptr, L"PS", L"ps_6_6");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = graphicsDesc;
+        desc.VS = CD3DX12_SHADER_BYTECODE(VS->GetBufferPointer(), VS->GetBufferSize());
+        desc.PS = CD3DX12_SHADER_BYTECODE(PS->GetBufferPointer(), PS->GetBufferSize());
+
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.DepthStencilState.DepthEnable = false;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&m_PSOs["debug"])));
+    }
 }
 
 std::vector<CD3DX12_STATIC_SAMPLER_DESC> PipelineStates::GetStaticSamplers()

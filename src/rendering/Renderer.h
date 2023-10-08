@@ -10,7 +10,6 @@
 #include "dx/Utils.h"
 
 #include "FrameResource.h"
-#include "PipelineStateManager.h"
 #include "Camera.h"
 #include "PostProcessing.h"
 #include "Material.h"
@@ -24,7 +23,7 @@
 #include "TAA.h"
 #include "VXGI.h"
 
-#define SPONZA_SCENE 1
+#define SPONZA_SCENE 0
 #define TEST_SCENE (!SPONZA_SCENE)
 
 struct RenderItem
@@ -45,7 +44,6 @@ public:
 	Renderer(Ref<DxContext> dxContext, UINT width, UINT height);
 	~Renderer()
 	{
-		RenderingUtils::Cleanup();
 		PipelineStates::Cleanup();
 	}
 
@@ -81,15 +79,9 @@ private:
 	void BuildLightingDataBuffer();
 	void BuildRenderItems();
 
-	void ForwardRendering(GraphicsCommandList commandList);
-
-	void DeferredRendering(GraphicsCommandList commandList);
 	void GBufferPass(GraphicsCommandList commandList);
-	void AmbientLightPass(GraphicsCommandList commandList);
-	void LightingPass(GraphicsCommandList commandList);
 	void DeferredLightingPass(GraphicsCommandList commandList);
 
-	void DrawNormalsAndDepth(GraphicsCommandList commandList);
 	void ShadowMapPass(GraphicsCommandList commandList);
 	void DrawRenderItems(GraphicsCommandList commandList, bool transparent = false);
 	void DrawSkybox(GraphicsCommandList commandList);
@@ -97,15 +89,14 @@ private:
 	void VoxelizeScene(GraphicsCommandList commandList);
 	void DebugVoxel(GraphicsCommandList commandList);
 
-	void Debug(GraphicsCommandList commandList, Descriptor srv, int slot = 0);
+	// divide the whole window into 4x4 grid, and draw the texture at slot <slot>
+	void Debug(GraphicsCommandList commandList, Descriptor srv, UINT slot = 0);
 
 private:
 	Ref<DxContext> m_DxContext;
 
 	std::vector<std::unique_ptr<FrameResource>> m_FrameResources;
 	int m_CurrFrameResourceIndex = 0;
-
-	std::unique_ptr<PipelineStateManager> m_PipelineStateManager;
 
 	D3D12_VIEWPORT m_ScreenViewport = {};
 	D3D12_RECT m_ScissorRect = {};
@@ -119,7 +110,6 @@ private:
 	Camera m_Camera;
 	std::unique_ptr<CascadedShadowMap> m_CascadedShadowMap;
 
-	Ref<Mesh> m_PointLightGeo;
 	Ref<Mesh> m_Skybox;
 	std::vector<Ref<RenderItem>> m_RenderItems;
 

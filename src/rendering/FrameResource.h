@@ -34,6 +34,7 @@ struct PassConstants
 	XMFLOAT2 Jitter;
 	XMFLOAT2 PreviousJitter;
 	BOOL EnableGI;
+	BOOL EnableIBL;
 };
 
 struct SSAOConstants

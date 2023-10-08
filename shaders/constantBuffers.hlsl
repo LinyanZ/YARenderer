@@ -30,6 +30,7 @@ cbuffer PassCB : register(b1)
     float2 g_Jitter;
     float2 g_PreviousJitter;
     bool g_EnableGI;
+    bool g_EnableIBL;
 };
 
 cbuffer MatCB : register(b2)
